@@ -32,6 +32,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+static bool is_sem_thread_priority_less(const struct list_elem* a, const struct list_elem* b, void* aux);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -69,6 +71,10 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0) 
     {
       list_push_back (&sema->waiters, &thread_current ()->elem);
+      if (list_size(&sema->waiters) > 1)
+      {
+          list_sort(&sema->waiters, is_thread_priority_less, NULL);
+      }
       thread_block ();
     }
   sema->value--;
@@ -285,7 +291,7 @@ cond_init (struct condition *cond)
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
 void
-cond_wait (struct condition *cond, struct lock *lock) 
+cond_wait (struct condition *cond, struct lock *lock)
 {
   struct semaphore_elem waiter;
 
@@ -296,9 +302,29 @@ cond_wait (struct condition *cond, struct lock *lock)
   
   sema_init (&waiter.semaphore, 0);
   list_push_back (&cond->waiters, &waiter.elem);
+  if (list_size(&cond->waiters) > 1)
+  {
+      list_sort(&cond->waiters, is_sem_thread_priority_less, NULL);
+  }
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
+}
+
+static bool
+is_sem_thread_priority_less(const struct list_elem* a, const struct list_elem* b, void* aux)
+{
+    struct list *semAWaiters = &list_entry(a, struct semaphore_elem, elem)->semaphore.waiters;
+    struct list *semBWaiters = &list_entry(b, struct semaphore_elem, elem)->semaphore.waiters;
+    if ( list_entry( list_begin(semAWaiters), struct thread, elem )->priority < 
+         list_entry( list_begin(semBWaiters), struct thread, elem )->priority )
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then

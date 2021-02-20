@@ -68,7 +68,6 @@ static struct thread *next_thread_to_run (void);
 static struct thread *peek_next_thread_to_run (void);
 static void queue_thread(struct list *queue, struct thread *t);
 static void make_thread_ready(struct thread *t);
-static bool is_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
@@ -247,7 +246,10 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
-  //list_sort(&ready_list, &is_thread_priority_less, 0);  
+  if (list_size(&ready_list) > 1)
+  {
+      list_sort(&ready_list, &is_thread_priority_less, NULL);
+  }    
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -555,10 +557,10 @@ make_thread_ready(struct thread *t)
 	intr_set_level(old_intr);
 }
 
-static bool
+bool
 is_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux)
 {
-	if(list_entry(a, struct thread, elem)->priority < list_entry(b, struct thread, elem)->priority )
+	if( list_entry(a, struct thread, elem)->priority < list_entry(b, struct thread, elem)->priority )
 	{
 		return true;
 	}
