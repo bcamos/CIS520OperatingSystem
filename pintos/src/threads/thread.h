@@ -139,5 +139,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 bool is_thread_priority_less(const struct list_elem* a, const struct list_elem* b, void* aux);
+void insert_thread(struct list* queue, struct thread* t);
 
 #endif /* threads/thread.h */

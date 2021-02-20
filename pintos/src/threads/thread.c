@@ -66,7 +66,6 @@ static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
 
 static struct thread *peek_next_thread_to_run (void);
-static void insert_thread(struct list *queue, struct thread *t);
 static void make_thread_ready(struct thread *t);
 
 static void init_thread (struct thread *, const char *name, int priority);
@@ -522,7 +521,7 @@ peek_next_thread_to_run (void)
      return list_entry ( list_front (&ready_list) , struct thread, elem);
 }
 
-static void
+void
 insert_thread(struct list *queue, struct thread *t)
 {
    if(list_empty(queue))

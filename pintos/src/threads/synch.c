@@ -70,11 +70,12 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+      insert_thread( &sema->waiters, thread_current() );
+      /*list_push_back (&sema->waiters, &thread_current ()->elem);
       if (list_size(&sema->waiters) > 1)
       {
           list_sort(&sema->waiters, is_thread_priority_less, NULL);
-      }
+      }*/
       thread_block ();
     }
   sema->value--;
