@@ -64,6 +64,12 @@ static void kernel_thread (thread_func *, void *aux);
 static void idle (void *aux UNUSED);
 static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
+
+static struct thread *peek_next_thread_to_run (void);
+static void queue_thread(struct list *queue, struct thread *t);
+static void make_thread_ready(struct thread *t);
+static bool is_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux);
+
 static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
@@ -200,7 +206,10 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
+  if(thread_get_priority() < priority)
+  {
+     thread_yield();
+  }
   return tid;
 }
 
@@ -238,6 +247,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
+  //list_sort(&ready_list, &is_thread_priority_less, 0);  
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -336,6 +346,10 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  if(new_priority < peek_next_thread_to_run()->priority)
+  {
+     thread_yield();
+  }
 }
 
 /* Returns the current thread's priority. */
@@ -375,7 +389,7 @@ thread_get_recent_cpu (void)
   /* Not yet implemented. */
   return 0;
 }
-
+
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -495,6 +509,65 @@ next_thread_to_run (void)
   else
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
 }
+
+static struct thread *
+peek_next_thread_to_run (void)
+{
+   if (list_empty (&ready_list))
+     return idle_thread;
+   else
+     return list_entry ( list_front (&ready_list) , struct thread, elem);
+}
+
+static void
+queue_thread(struct list *queue, struct thread *t)
+{
+   if(list_empty(queue))
+   {
+	list_push_back(queue, &t->elem);	
+   }
+   else
+   {
+   	struct list_elem *cur = list_front(queue);
+   	int found = 0;
+        do
+   	{  
+        	if(t->priority > list_entry(cur, struct thread, elem)->priority)
+		{
+			found = -1;
+		}
+		else
+		{
+			cur = cur->next;
+		}
+   	}
+   	while(!found && cur != list_end(queue));
+	list_insert(cur, &t->elem);
+   }
+}
+
+static void
+make_thread_ready(struct thread *t)
+{
+	enum intr_level old_intr = intr_disable();
+	queue_thread(&ready_list, t);
+	t->status = THREAD_READY;
+	intr_set_level(old_intr);
+}
+
+static bool
+is_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	if(list_entry(a, struct thread, elem)->priority < list_entry(b, struct thread, elem)->priority )
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
 
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
