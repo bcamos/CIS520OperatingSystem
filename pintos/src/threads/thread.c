@@ -66,7 +66,7 @@ static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
 
 static struct thread *peek_next_thread_to_run (void);
-static void queue_thread(struct list *queue, struct thread *t);
+static void insert_thread(struct list *queue, struct thread *t);
 static void make_thread_ready(struct thread *t);
 
 static void init_thread (struct thread *, const char *name, int priority);
@@ -245,11 +245,12 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
-  if (list_size(&ready_list) > 1)
+  insert_thread(&ready_list, t);
+  //list_push_back (&ready_list, &t->elem);
+  /*if (list_size(&ready_list) > 1)
   {
       list_sort(&ready_list, &is_thread_priority_less, NULL);
-  }    
+  }    */
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -522,29 +523,29 @@ peek_next_thread_to_run (void)
 }
 
 static void
-queue_thread(struct list *queue, struct thread *t)
+insert_thread(struct list *queue, struct thread *t)
 {
    if(list_empty(queue))
    {
-	list_push_back(queue, &t->elem);	
+       list_push_back(queue, &t->elem);	
    }
    else
    {
-   	struct list_elem *cur = list_front(queue);
-   	int found = 0;
+   	    struct list_elem *cur = list_front(queue);
+   	    bool found = false;
         do
-   	{  
+   	    {  
         	if(t->priority > list_entry(cur, struct thread, elem)->priority)
-		{
-			found = -1;
-		}
-		else
-		{
-			cur = cur->next;
-		}
-   	}
-   	while(!found && cur != list_end(queue));
-	list_insert(cur, &t->elem);
+		    {
+			    found = true;
+		    }
+		    else
+		    {
+			    cur = cur->next;
+		    }
+   	    } while(found == false && cur != list_end(queue));
+
+	    list_insert(cur, &t->elem);
    }
 }
 
@@ -552,7 +553,7 @@ static void
 make_thread_ready(struct thread *t)
 {
 	enum intr_level old_intr = intr_disable();
-	queue_thread(&ready_list, t);
+	insert_thread(&ready_list, t);
 	t->status = THREAD_READY;
 	intr_set_level(old_intr);
 }
