@@ -405,6 +405,45 @@ thread_set_priority (int new_priority)
   }
 }
 
+/* NOTE: Inspired from method thread_given_set_priority in repo: https://github.com/codyjack/OS-pintos/tree/master/pintos/src/threads */
+void 
+donate_priority_to( struct thread *t, int new_priority )
+{
+    t->old_priority = t->priority;
+    t->contains_donated = true;
+    t->priority = new_priority;
+
+    if ( t->status == THREAD_READY )
+    {
+        list_remove(&t->elem);
+        insert_thread(&ready_list, t);
+    }
+
+    if ( thread_get_priority() < peek_next_thread_to_run()->priority )
+    {
+        thread_yield();
+    }
+}
+
+void
+restore_donated_priority(struct thread *t)
+{
+    ASSERT(t->contains_donated);
+    t->contains_donated = false;
+    t->priority = t->old_priority;
+
+    if (t->status == THREAD_READY)
+    {
+        list_remove(&t->elem);
+        insert_thread(&ready_list, t);
+    }
+
+    if (thread_get_priority() < peek_next_thread_to_run()->priority)
+    {
+        thread_yield();
+    }
+}
+
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
