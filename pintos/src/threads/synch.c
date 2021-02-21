@@ -120,11 +120,22 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  struct thread *unblockedThread;
+  bool existUnblockedThread = false;
+  if (!list_empty(&sema->waiters))
+  {
+      unblockedThread = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
+      thread_unblock(unblockedThread);
+      existUnblockedThread = true;
+  }
+    
   sema->value++;
   intr_set_level (old_level);
+  //Check to see if thread unblocked thread should be executing now that semaphore is free
+  if (existUnblockedThread && thread_get_priority() < unblockedThread->priority)
+  {
+      thread_yield();
+  }
 }
 
 static void sema_test_helper (void *sema_);
