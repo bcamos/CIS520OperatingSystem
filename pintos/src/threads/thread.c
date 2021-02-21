@@ -28,6 +28,10 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of sleeping threads */
+static struct list sleeping_list;
+struct semaphore tsleep_sema;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -208,6 +212,54 @@ thread_create (const char *name, int priority,
      thread_yield();
   }
   return tid;
+}
+
+/* Put the thread to sleep until the specified number of ticks */
+void
+thread_sleep(struct thread* t)
+{
+
+    sema_down(&tsleep_sema);
+    list_push_back(&sleeping_list, &t->elem);
+    sema_up(&tsleep_sema);
+
+    enum intr_level old_level;
+    old_level = intr_disable();
+
+    t->status = THREAD_BLOCKED;
+    schedule();
+
+    intr_set_level(old_level);
+}
+
+/* Wake up thread after the specified number of ticks */
+void
+thread_wake(void)
+{
+    struct list_elem* e;
+    struct thread* t;
+    bool found = false;
+
+
+    for (e = list_begin(&sleeping_list); e != list_end(&sleeping_list);
+        e = list_next(e))
+    {
+        t = list_entry(e, struct thread, elem);
+        t->sleep_ticks--;
+        if (t->sleep_ticks == 0) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT(intr_context());
+    if (found) {
+        list_remove(&t->elem);
+        ASSERT(t->status == THREAD_BLOCKED);
+        insert_thread(&ready_list, t);
+        //list_push_back(&ready_list, &t->elem);
+        t->status = THREAD_READY;
+    }
+
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
