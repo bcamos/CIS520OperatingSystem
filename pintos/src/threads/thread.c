@@ -407,19 +407,33 @@ thread_set_priority (int new_priority)
 
 /* NOTE: Inspired from method thread_given_set_priority in repo: https://github.com/codyjack/OS-pintos/tree/master/pintos/src/threads */
 void 
-donate_priority_to( struct thread *t, int new_priority )
+donate_priority_to( struct thread *from, struct thread *to )
 {
     enum intr_level old_intr = intr_disable();
-
-    t->old_priority = t->priority;
-    t->contains_donated = true;
-    t->priority = new_priority;
-
-    if ( t->status == THREAD_READY )
+        
+    if (!to->contains_donated && from->priority > to->priority)
     {
-        list_remove(&t->elem);
-        insert_thread(&ready_list, t);
+        from->child_donated_to = to;
+        to->old_priority = to->priority;
+        to->contains_donated = true;
+        to->parent_donated_to_me = from;
     }
+
+    do
+    {
+        if (from->priority > to->priority)
+        {
+            to->priority = from->priority;
+
+            if (to->status == THREAD_READY)
+            {
+                list_remove(&to->elem);
+                insert_thread(&ready_list, to);
+            }
+        }
+        
+        to = to->child_donated_to;
+    } while ( to != NULL );
 
     intr_set_level(old_intr);
 
@@ -438,11 +452,18 @@ restore_donated_priority(struct thread *t)
 
     t->contains_donated = false;
     t->priority = t->old_priority;
+    t->parent_donated_to_me->child_donated_to = NULL;
+    t->parent_donated_to_me = NULL;
 
     if (t->status == THREAD_READY)
     {
         list_remove(&t->elem);
         insert_thread(&ready_list, t);
+    }
+
+    if (t->child_donated_to != NULL)
+    {
+        donate_priority_to(t, t->child_donated_to);
     }
 
     intr_set_level(old_intr);
@@ -578,6 +599,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->child_donated_to = NULL;
+  t->contains_donated = false;
+  t->parent_donated_to_me = NULL;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

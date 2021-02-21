@@ -90,6 +90,8 @@ struct thread
     int priority;                       /* Priority. */
     int old_priority;                   /* Old priority if in donated */
     bool contains_donated;              /* whether the thread contains a donated priority */
+    struct thread *child_donated_to;    /* donated priority to child thread */
+    struct thread* parent_donated_to_me; /* donation from parent */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -138,7 +140,7 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
-void donate_priority_to(struct thread *t, int new_priority);
+void donate_priority_to(struct thread *from, struct thread *to);
 void restore_donated_priority(struct thread *t);
 
 int thread_get_nice (void);

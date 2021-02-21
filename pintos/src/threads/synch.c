@@ -213,11 +213,13 @@ lock_acquire (struct lock *lock)
 
   enum intr_level old_intr = intr_disable();
 
+  struct thread* current = thread_current();
+
   /* Check to see if someone else has the lock */
-  if (lock->holder != NULL && lock->holder != thread_current()
-   && lock->holder->priority < thread_get_priority())
-  {      /* Donation required */      
-      donate_priority_to(lock->holder, thread_get_priority());
+  if (lock->holder != NULL && lock->holder != current
+   && lock->holder->priority < current->priority)
+  {      /* Donation required */
+      donate_priority_to( current, lock->holder );
   }
 
   intr_set_level(old_intr);
