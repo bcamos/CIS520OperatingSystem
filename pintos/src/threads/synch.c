@@ -32,6 +32,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+static bool is_semaphore_priority_more(struct list_elem *a, struct list_elem *b, void *aux);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -69,11 +71,6 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0) 
     {
       insert_thread( &sema->waiters, thread_current() );
-      /*list_push_back (&sema->waiters, &thread_current ()->elem);
-      if (list_size(&sema->waiters) > 1)
-      {
-          list_sort(&sema->waiters, is_thread_priority_less, NULL);
-      }*/
       thread_block ();
     }
   sema->value--;
@@ -128,12 +125,14 @@ sema_up (struct semaphore *sema)
   }
     
   sema->value++;
-  intr_set_level (old_level);
+
   //Check to see if thread unblocked thread should be executing now that semaphore is free
   if (existUnblockedThread && thread_get_priority() < unblockedThread->priority)
   {
       thread_yield();
   }
+
+  intr_set_level (old_level);  
 }
 
 static void sema_test_helper (void *sema_);
@@ -267,7 +266,22 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
+    int priority;                   /* priority of semaphore element */
   };
+
+static bool
+is_semaphore_priority_more(struct list_elem* a, struct list_elem* b, void *aux)
+{
+    if ( list_entry(a, struct semaphore_elem, elem)->priority >
+         list_entry(b, struct semaphore_elem, elem)->priority )
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -311,7 +325,11 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_push_back (&cond->waiters, &waiter.elem);
+
+  /* NOTE: Inspired from https://github.com/codyjack/OS-pintos/blob/master/pintos/src/threads/synch.c */
+  waiter.priority = thread_get_priority();
+  list_insert_ordered(&cond->waiters, &waiter.elem, is_semaphore_priority_more, NULL);
+
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
