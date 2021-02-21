@@ -66,7 +66,6 @@ static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
 
 static struct thread *peek_next_thread_to_run (void);
-static void make_thread_ready(struct thread *t);
 
 static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
@@ -546,15 +545,6 @@ insert_thread(struct list *queue, struct thread *t)
 
 	    list_insert(cur, &t->elem);
    }
-}
-
-static void
-make_thread_ready(struct thread *t)
-{
-	enum intr_level old_intr = intr_disable();
-	insert_thread(&ready_list, t);
-	t->status = THREAD_READY;
-	intr_set_level(old_intr);
 }
 
 bool
