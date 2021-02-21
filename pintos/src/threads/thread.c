@@ -409,6 +409,8 @@ thread_set_priority (int new_priority)
 void 
 donate_priority_to( struct thread *t, int new_priority )
 {
+    enum intr_level old_intr = intr_disable();
+
     t->old_priority = t->priority;
     t->contains_donated = true;
     t->priority = new_priority;
@@ -418,6 +420,8 @@ donate_priority_to( struct thread *t, int new_priority )
         list_remove(&t->elem);
         insert_thread(&ready_list, t);
     }
+
+    intr_set_level(old_intr);
 
     if ( thread_get_priority() < peek_next_thread_to_run()->priority )
     {
@@ -429,6 +433,9 @@ void
 restore_donated_priority(struct thread *t)
 {
     ASSERT(t->contains_donated);
+
+    enum intr_level old_intr = intr_disable();
+
     t->contains_donated = false;
     t->priority = t->old_priority;
 
@@ -437,6 +444,8 @@ restore_donated_priority(struct thread *t)
         list_remove(&t->elem);
         insert_thread(&ready_list, t);
     }
+
+    intr_set_level(old_intr);
 
     if (thread_get_priority() < peek_next_thread_to_run()->priority)
     {

@@ -211,6 +211,17 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  enum intr_level old_intr = intr_disable();
+
+  /* Check to see if someone else has the lock */
+  if (lock->holder != NULL && lock->holder != thread_current()
+   && lock->holder->priority < thread_get_priority())
+  {      /* Donation required */      
+      donate_priority_to(lock->holder, thread_get_priority());
+  }
+
+  intr_set_level(old_intr);
+
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 }
@@ -246,8 +257,14 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  struct thread* cur_holder = lock->holder;
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+
+  if (cur_holder->contains_donated)
+  {
+      restore_donated_priority(cur_holder);
+  }  
 }
 
 /* Returns true if the current thread holds LOCK, false
