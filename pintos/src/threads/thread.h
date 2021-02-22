@@ -91,7 +91,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     int saved_priority;                 /* True priority if donated */
-    int donations[DONATION_MAX];        /* queue of all priority donations */
+    int donations[DONATION_MAX];        /* stack of all priority donations */
     int donation_index;                 /* start index */    
     bool contains_donated;              /* whether the thread contains a donated priority */
     struct lock* lock_blocked_by;       /* a the thread is blocked by */

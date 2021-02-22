@@ -14,9 +14,14 @@ Dawson Field <dawsonf@ksu.edu>
 >> If you have any preliminary comments on your submission, notes for
 >> the TA, or extra credit, please give them here.
 
+    Submitting this very close to deadline; tests indicate something not working
+    quite as planned on the donations unfortunately.
+
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation,
 >> course text, lecture notes, and course staff.
+
+>> Consulted: https://github.com/codyjack/OS-pintos/blob/master/pintos/src/threads/synch.c
 
 
                  ALARM CLOCK
@@ -64,19 +69,54 @@ Dawson Field <dawsonf@ksu.edu>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+In struct thread added:
+    int saved_priority -- the true priority of a given thread
+    int donations[DONATION_MAX] -- a stack of previous priority donations up to 10
+    int donation_index -- the current index of the donation stack
+    bool contains_donated -- whether the thread contains a donated priority or not
+    struct lock* lock_blocked_by -- a pointer to a lock that this thread is directly blocked by
+
+Constant - DONATION_MAX set to 10 -- maximum record of donations for a thread
+Constant - INVALID_INDEX set to -1 -- an invalid index for an array to denote N/A
+
+In struct semaphore_elem added:
+    int priority -- for sorting purposes, so that the highest priority thread in the waiter list is in the front
+
 >> B2: Explain the data structure used to track priority donation.
 
+We store the true priority of a thread in an int called saved_priority; when a priority is donated, it is saved to the top
+of the stack of donations (int array), this allows a thread to maintain its true priority, while also having a history of priorities
+to revert back to when it needs to give up its higher priority -- if the priority to be popped is less than the saved priority, then we know we can 
+empty the stack and revert back to the true value. When a thread is blocked, we also store a pointer to this lock so that if another higher thread
+needs something a lower priority blocked thread, it can traverse and donate its priority to the appropriate thread.
 
 ---- ALGORITHMS ----
 
 >> B3: How do you ensure that the highest priority thread waiting for
 >> a lock, semaphore, or condition variable wakes up first?
 
+Maintaining a sorted list by priority made most sense (such that the first element popped is the highest priority).
+Wrote an insertion method to handle this for threads only
+to discover later that there is already a library defined insert_list_sorted method -- the previous method was kept since it worked, however
+for the semaphores we used the insert_list_sorted method and defined a compare function to maintain the list in descending order. 
+
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
 
+First disable interupts, and check to see if the process is the first one to grab the lock; if it is, grab the semaphore, and record
+in the lock that the current thread has it. If the process is not the first, then try to donate priority to the thread that has the lock if 
+the current thread has the highest priority; after donating, check to see if the current holder of the lock is also locked by another process. If it
+is also blocked, then donate priority to said process as well, and so... on. After donating priorities, try to grab lock semaphore, which should get
+stopped (since a different thread had the lock).
+
+Nested donation is handled by iterating over the locks the threads are blocked by (a pointer to the lock blocking a thread was 
+added to the thread struct).
+
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
+
+Lock holder for the lock is set null, release semaphore (lock) for the next process to grab. If the current thread had a donated priority, then
+restore it the priority that it was prior to the donation -- unless the saved_priority is the highest, then restore to saved_priority.
 
 ---- SYNCHRONIZATION ----
 
@@ -84,10 +124,22 @@ Dawson Field <dawsonf@ksu.edu>
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
+One potential race-condition is a current thread tries to lower its priority, a thread switch occurs,
+and the new thread tries to donate it's priority to the thread. It would be extremely nice to use a lock
+or a semaphore that is unique to each thread for reading and/or writing occurs -- chose to disable interrupts in 
+this case, because was concerned about accidently introducing infinite loops in including synch.h due to the way that lock_aqcuire and
+lock_release are defined. A semaphore would probably work though, but have to include synch.h file which might be a bit dangerous.
+
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+Instead of keeping track of the pointer to the lock a particular thread is blocked by, tried implementing
+a doubly-linked list structure to keep track of donations (which thread donated to me, who i donated to); 
+wasn't able to get some of our tests to work. Took inspiration from an online source and decided it was more intuitive
+to keep track of a lock that a thread is blocked by than maintaining a doubly-linked list; was concerned about race-conditions for threads
+of the same priority breaking the chain of a doubly-linked list structure of donations and the true value of a priority getting lost.
 
 
               ADVANCED SCHEDULER [EXTRA CREDIT]
