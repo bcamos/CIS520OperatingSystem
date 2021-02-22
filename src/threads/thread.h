@@ -10,6 +10,7 @@ enum thread_status
   {
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
+    THREAD_SLEEPING,	/* Sleeping and needs to be woken up */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
     THREAD_DYING        /* About to be destroyed. */
   };
@@ -88,7 +89,8 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    struct list_elem allelem;           /* List element for all threads list. */
+    struct list_elem allelem;		/* List element for all threads list. */
+    int64_t wakeup_time;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -109,6 +111,8 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 void thread_start (void);
+
+void thread_sleep(int64_t ticks);
 
 void thread_tick (void);
 void thread_print_stats (void);

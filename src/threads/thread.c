@@ -28,6 +28,9 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of the threads that are in the THREAD_SLEEP state and have to be waken up to run*/
+static struct list asleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -116,6 +119,25 @@ thread_start (void)
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
 }
+
+void
+thread_sleep (int64_t ticks)
+{
+ struct thread *current = thread_current();
+ enum intr_level old_level;
+
+
+ old_level = intr_disable();
+
+ if(current!= idle_thread){
+	 list_push_back(&asleep_list, &current->elem);
+	 current->status = THREAD_SLEEPING;
+	 current->wakeup_time = timer_ticks() + ticks ;
+	schedule();
+ }
+ intr_set_level(old_level);
+}
+
 
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
@@ -555,15 +577,32 @@ schedule (void)
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
   struct thread *prev = NULL;
+ 
+
+  struct list_elem *a, *sleep = list_begin(&asleep_list);
+
+  int64_t live_ticks = timer_ticks();
 
   ASSERT (intr_get_level () == INTR_OFF);
   ASSERT (cur->status != THREAD_RUNNING);
   ASSERT (is_thread (next));
 
+  while(a != list_end(&asleep_list)){
+	 struct thread *th = list_entry(a, struct thread, allelem);
+	  if(live_ticks >= th->wakeup_time){
+		  list_push_back(&ready_list, &th->elem);
+		  th->status = THREAD_READY;
+		  sleep = a;
+		  a = list_next(a);
+		  list_remove(sleep);
+		  }
+	  else a = list_next(a);
+	}	 
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
 }
+
 
 /* Returns a tid to use for a new thread. */
 static tid_t
