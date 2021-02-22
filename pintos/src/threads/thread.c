@@ -398,42 +398,44 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
-  if(new_priority < peek_next_thread_to_run()->priority)
-  {
-     thread_yield();
-  }
-}
-
-/* NOTE: Inspired from method thread_given_set_priority in repo: https://github.com/codyjack/OS-pintos/tree/master/pintos/src/threads */
-void 
-donate_priority_to( struct thread *from, struct thread *to )
-{
     enum intr_level old_intr = intr_disable();
-        
-    if (!to->contains_donated && from->priority > to->priority)
-    {
-        from->child_donated_to = to;
-        to->old_priority = to->priority;
-        to->contains_donated = true;
-        to->parent_donated_to_me = from;
+
+    struct thread* current = thread_current();
+    current->saved_priority = new_priority;
+
+    if (!current->contains_donated || current->priority < new_priority)
+    {        
+        current->priority = new_priority;
+
+        //Empty list
+        while (!list_empty(&current->donations))
+        {
+            list_pop_front(&current->donations);
+        }
     }
 
-    do
-    {
-        if (from->priority > to->priority)
-        {
-            to->priority = from->priority;
+    intr_set_level(old_intr);
 
-            if (to->status == THREAD_READY)
-            {
-                list_remove(&to->elem);
-                insert_thread(&ready_list, to);
-            }
-        }
-        
-        to = to->child_donated_to;
-    } while ( to != NULL );
+    if(current->priority < peek_next_thread_to_run()->priority)
+    {
+        thread_yield();
+    }
+}
+
+/* NOTE: Inspired from method thread_given_set_priority in solution: https://github.com/codyjack/OS-pintos/tree/master/pintos/src/threads */
+void 
+donate_priority_to( struct thread *to, int new_priority )
+{
+    enum intr_level old_intr = intr_disable();
+
+    to->priority = new_priority;
+    to->contains_donated = true;
+
+    if (to->status == THREAD_READY)
+    {
+        list_remove(&to->elem);
+        insert_thread(&ready_list, to);
+    }        
 
     intr_set_level(old_intr);
 
@@ -451,19 +453,12 @@ restore_donated_priority(struct thread *t)
     enum intr_level old_intr = intr_disable();
 
     t->contains_donated = false;
-    t->priority = t->old_priority;
-    t->parent_donated_to_me->child_donated_to = NULL;
-    t->parent_donated_to_me = NULL;
+    t->priority = t->saved_priority;    
 
     if (t->status == THREAD_READY)
     {
         list_remove(&t->elem);
         insert_thread(&ready_list, t);
-    }
-
-    if (t->child_donated_to != NULL)
-    {
-        donate_priority_to(t, t->child_donated_to);
     }
 
     intr_set_level(old_intr);
@@ -598,10 +593,12 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->saved_priority = priority;
   t->magic = THREAD_MAGIC;
-  t->child_donated_to = NULL;
+  t->lock_blocked_by = NULL;
   t->contains_donated = false;
-  t->parent_donated_to_me = NULL;
+  t->donation_end = 0;
+  t->donation_start = 0;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

@@ -88,10 +88,12 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    int old_priority;                   /* Old priority if in donated */
+    int saved_priority;                 /* True priority if donated */
+    int donations[10];                  /* queue of all priority donations */
+    int donation_start;                 /* end index */
+    int donation_end;                    
     bool contains_donated;              /* whether the thread contains a donated priority */
-    struct thread *child_donated_to;    /* donated priority to child thread */
-    struct thread* parent_donated_to_me; /* donation from parent */
+    struct lock* lock_blocked_by;       /* a the thread is blocked by */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -140,7 +142,7 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
-void donate_priority_to(struct thread *from, struct thread *to);
+void donate_priority_to(struct thread *to, int new_priority);
 void restore_donated_priority(struct thread *t);
 
 int thread_get_nice (void);

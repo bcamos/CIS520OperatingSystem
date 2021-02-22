@@ -213,19 +213,29 @@ lock_acquire (struct lock *lock)
 
   enum intr_level old_intr = intr_disable();
 
-  struct thread* current = thread_current();
+  struct thread *current = thread_current();
 
-  /* Check to see if someone else has the lock */
-  if (lock->holder != NULL && lock->holder != current
-   && lock->holder->priority < current->priority)
-  {      /* Donation required */
-      donate_priority_to( current, lock->holder );
-  }
+  /* NOTE: Inspired by solution in https://github.com/codyjack/OS-pintos/blob/master/pintos/src/threads/synch.c */
 
-  intr_set_level(old_intr);
+  if (lock->holder != NULL)
+  {   
+      struct lock* blocking_lock = current->lock_blocked_by = lock;     
+
+      while (blocking_lock != NULL && blocking_lock->holder->priority < current->priority)
+      {
+          donate_priority_to(blocking_lock->holder, current->priority);
+
+          // Update to find right-most blocking lock
+          blocking_lock = blocking_lock->holder->lock_blocked_by;
+      }
+  }  
 
   sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+
+  lock->holder = current;
+  current->lock_blocked_by = NULL;
+
+  intr_set_level(old_intr);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
