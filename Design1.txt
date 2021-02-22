@@ -34,7 +34,7 @@ Dawson Field <dawsonf@ksu.edu>
 >> enumeration.  Identify the purpose of each in 25 words or less.
   
   static struct sleeping_list -- a list with all of the current sleeping threads
-  struct semaphore tsleep_sema -- 
+  struct semaphore tsleep_sema -- the semaphore used to sleep or  block threads from running
   struct thread: sleep_ticks -- keeps track of the number of ticks the thread needs to sleep for.
   
 ---- ALGORITHMS ----
@@ -52,18 +52,19 @@ The implementation of the thread_wake function minimizes the amount of time spen
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
-
+The first action in the timer_sleep function is calling the thread_current function which returns one current running thread. If the function is not able to return multiple running threads at a time then race conditions are avoided. 
 
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
 
+The program stops execution of the timer_sleep function and focuses on the outcome of the interrupt handler. If the function is not being executed then another thread is not able to call the function. 
 
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> other designs that you considered?
 
-
+This design is helpful because race condtions have been avoided and less time is spent in the interrupt handler. The thread_sleep function makes sure to only work with one thread at a time. It's superior because there is the use of semaphores and the flow of the code makes sense. 
 
              PRIORITY SCHEDULING
              ===================
