@@ -23,6 +23,8 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+#define DONATION_MAX 10
+#define INVALID_INDEX -1
 
 /* A kernel thread or user process.
 
@@ -89,9 +91,8 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     int saved_priority;                 /* True priority if donated */
-    int donations[10];                  /* queue of all priority donations */
-    int donation_start;                 /* end index */
-    int donation_end;                    
+    int donations[DONATION_MAX];        /* queue of all priority donations */
+    int donation_index;                 /* start index */    
     bool contains_donated;              /* whether the thread contains a donated priority */
     struct lock* lock_blocked_by;       /* a the thread is blocked by */
     struct list_elem allelem;           /* List element for all threads list. */

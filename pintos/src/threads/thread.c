@@ -296,11 +296,6 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   insert_thread(&ready_list, t);
-  //list_push_back (&ready_list, &t->elem);
-  /*if (list_size(&ready_list) > 1)
-  {
-      list_sort(&ready_list, &is_thread_priority_less, NULL);
-  }    */
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -406,12 +401,7 @@ thread_set_priority (int new_priority)
     if (!current->contains_donated || current->priority < new_priority)
     {        
         current->priority = new_priority;
-
-        //Empty list
-        while (!list_empty(&current->donations))
-        {
-            list_pop_front(&current->donations);
-        }
+        current->donation_index = INVALID_INDEX;
     }
 
     intr_set_level(old_intr);
@@ -427,6 +417,12 @@ void
 donate_priority_to( struct thread *to, int new_priority )
 {
     enum intr_level old_intr = intr_disable();
+
+    if (to->donation_index + 1 < DONATION_MAX)
+    {
+        to->donation_index++;
+        to->donations[to->donation_index] = to->priority;
+    }
 
     to->priority = new_priority;
     to->contains_donated = true;
@@ -452,8 +448,17 @@ restore_donated_priority(struct thread *t)
 
     enum intr_level old_intr = intr_disable();
 
-    t->contains_donated = false;
-    t->priority = t->saved_priority;    
+    if (t->donation_index > INVALID_INDEX && t->donations[t->donation_index] > t->saved_priority)
+    {
+        t->priority = t->donations[t->donation_index];
+        t->donation_index--;
+    }
+    else
+    {
+        t->priority = t->saved_priority;
+        t->donation_index = INVALID_INDEX;
+        t->contains_donated = false;
+    }        
 
     if (t->status == THREAD_READY)
     {
@@ -597,8 +602,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->lock_blocked_by = NULL;
   t->contains_donated = false;
-  t->donation_end = 0;
-  t->donation_start = 0;
+  t->donation_index = INVALID_INDEX;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
