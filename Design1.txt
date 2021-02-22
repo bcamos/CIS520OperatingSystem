@@ -32,16 +32,21 @@ Dawson Field <dawsonf@ksu.edu>
 >> A1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
-
-
+  
+  static struct sleeping_list -- a list with all of the current sleeping threads
+  struct semaphore tsleep_sema -- 
+  struct thread: sleep_ticks -- keeps track of the number of ticks the thread needs to sleep for.
+  
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to your timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+In the timer_sleep function the current thread is accessed using the thread_current function. The amount of ticks for the sleep time is stored in a variable and then the current thread is passed as an argument for the thread_sleep function.
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
-
+The implementation of the thread_wake function minimizes the amount of time spent in the interrupt handler.
 
 ---- SYNCHRONIZATION ----
 
