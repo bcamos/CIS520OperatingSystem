@@ -15,7 +15,16 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {    
-    uint8_t status = SYS_HALT; // TODO get status from caller
+    /*
+        ASSUMPTION: from syscall interface in lib/user looks like stack is organized:
+            +12  -> arg2
+            +8   -> arg1
+            +4   -> arg0
+            esp  -> NUM (status code)
+
+        I haven't debugged and confirmed this yet... -- and offsets might not be exact if the arg takes more than 4 bytes... - (Ben)
+    */
+    uint8_t status = (uint8_t)*f->esp; // Get callers first argument from stack pointer
 
     // TODO Handle cases
     switch (status)
