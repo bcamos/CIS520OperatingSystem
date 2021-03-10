@@ -1,7 +1,7 @@
 #include "userprog/syscall.h"
-#define ARG0 (STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
-#define ARG1 (STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
-#define ARG2 (STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
+#define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
+#define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
+#define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
 
 static void syscall_handler (struct intr_frame *);
 
@@ -29,55 +29,55 @@ syscall_handler (struct intr_frame *f UNUSED)
     switch (*status)
     {
         case SYS_HALT:
-            halt();
+            halt ();
             break;
 
         case SYS_EXIT:
-            exit( ARG0(int, status) );
+            exit ( arg0(int, status) );
             break;
 
         case SYS_EXEC:
-            exec( ARG0(char*, status) );
+            exec ( arg0(char*, status) );
             break;
 
         case SYS_WAIT:
-            wait( ARG0(pid_t, status) );
+            wait ( arg0(pid_t, status) );
             break;
 
         case SYS_CREATE:
-            create( ARG0(char*, status), ARG1(unsigned int, status) );
+            create ( arg0(char*, status), arg1(unsigned int, status) );
             break;
 
         case SYS_REMOVE:
-            remove( ARG0(char*, status) );
+            remove ( arg0(char*, status) );
             break;
 
         case SYS_OPEN:
-            open(ARG0(char*, status));
+            open ( arg0(char*, status) );
             break;
 
         case SYS_FILESIZE:
-            filesize(ARG0(int, status));
+            filesize ( arg0(int, status) );
             break;
 
         case SYS_READ:
-            read(ARG0(int, status), ARG1(void*, status), ARG2(unsigned int, status));
+            read ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
         case SYS_WRITE:
-            write(ARG0(int, status), ARG1(void*, status), ARG2(unsigned int, status));
+            write ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
         case SYS_SEEK:
-            seek(ARG0(int, status), ARG1(unsigned int, status));
+            seek ( arg0(int, status), arg1(unsigned int, status) );
             break;
 
         case SYS_TELL:
-            tell(ARG0(int, status));
+            tell ( arg0(int, status) );
             break;
 
         case SYS_CLOSE:
-            close(ARG0(int, status));
+            close ( arg0(int, status) );
             break;
 
         default:
