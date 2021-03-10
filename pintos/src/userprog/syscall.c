@@ -1,8 +1,4 @@
 #include "userprog/syscall.h"
-#include <stdio.h>
-#include <syscall-nr.h>
-#include "threads/interrupt.h"
-#include "threads/thread.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -24,15 +20,15 @@ syscall_handler (struct intr_frame *f UNUSED)
 
         I haven't debugged and confirmed this yet... -- and offsets might not be exact if the arg takes more than 4 bytes... - (Ben)
     */
-    uint8_t status = (uint8_t)*f->esp; // Get callers first argument from stack pointer
+    uint8_t* status = (uint8_t*) f->esp; // Get callers first argument from stack pointer
 
     // TODO Handle cases
-    switch (status)
+    switch (*status)
     {
         case SYS_HALT:
-        case SYS_EXIT:                   
-        case SYS_EXEC:                   
-        case SYS_WAIT:                  
+        case SYS_EXIT:   
+        case SYS_EXEC:
+        case SYS_WAIT:
         case SYS_CREATE:             
         case SYS_REMOVE:                
         case SYS_OPEN:                  
@@ -43,6 +39,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         case SYS_TELL:          
         case SYS_CLOSE:
         default:
+            break;
     }
 
     printf("system call!\n");

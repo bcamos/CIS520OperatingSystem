@@ -1,10 +1,19 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
+#include <stdio.h>
+#include <syscall-nr.h>
+#include "threads/interrupt.h"
+#include "threads/thread.h"
+
+/* Process identifier. */
+typedef int pid_t;
+#define PID_ERROR ((pid_t) -1)
+
 void syscall_init (void);
 
-void halt(void) NO_RETURN;
-void exit(int status) NO_RETURN;
+void halt(void);
+void exit(int status);
 pid_t exec(const char* file);
 int wait(pid_t);
 bool create(const char* file, unsigned initial_size);
