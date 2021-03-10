@@ -1,4 +1,7 @@
 #include "userprog/syscall.h"
+#define ARG0 (STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
+#define ARG1 (STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
+#define ARG2 (STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
 
 static void syscall_handler (struct intr_frame *);
 
@@ -26,18 +29,57 @@ syscall_handler (struct intr_frame *f UNUSED)
     switch (*status)
     {
         case SYS_HALT:
-        case SYS_EXIT:   
+            halt();
+            break;
+
+        case SYS_EXIT:
+            exit( ARG0(int, status) );
+            break;
+
         case SYS_EXEC:
+            exec( ARG0(char*, status) );
+            break;
+
         case SYS_WAIT:
-        case SYS_CREATE:             
-        case SYS_REMOVE:                
-        case SYS_OPEN:                  
-        case SYS_FILESIZE:               
-        case SYS_READ:                 
-        case SYS_WRITE:                 
-        case SYS_SEEK:                   
-        case SYS_TELL:          
+            wait( ARG0(pid_t, status) );
+            break;
+
+        case SYS_CREATE:
+            create( ARG0(char*, status), ARG1(unsigned int, status) );
+            break;
+
+        case SYS_REMOVE:
+            remove( ARG0(char*, status) );
+            break;
+
+        case SYS_OPEN:
+            open(ARG0(char*, status));
+            break;
+
+        case SYS_FILESIZE:
+            filesize(ARG0(int, status));
+            break;
+
+        case SYS_READ:
+            read(ARG0(int, status), ARG1(void*, status), ARG2(unsigned int, status));
+            break;
+
+        case SYS_WRITE:
+            write(ARG0(int, status), ARG1(void*, status), ARG2(unsigned int, status));
+            break;
+
+        case SYS_SEEK:
+            seek(ARG0(int, status), ARG1(unsigned int, status));
+            break;
+
+        case SYS_TELL:
+            tell(ARG0(int, status));
+            break;
+
         case SYS_CLOSE:
+            close(ARG0(int, status));
+            break;
+
         default:
             break;
     }
@@ -62,7 +104,7 @@ halt(void)
     Conventionally, a status of 0 indicates success and nonzero values indicate errors.
 */
 void
-exit(int status UNUSED)
+exit(int status)
 {
     // TODO
 }
@@ -76,7 +118,7 @@ exit(int status UNUSED)
     You must use appropriate synchronization to ensure this.
 */
 pid_t
-exec(const char* file UNUSED)
+exec(const char* file)
 {
     return 0;
     // TODO
@@ -115,7 +157,7 @@ exec(const char* file UNUSED)
     Implementing this system call requires considerably more work than any of the rest.
 */
 int
-wait(pid_t pid UNUSED)
+wait(pid_t pid)
 {
     return 0;
     // TODO
@@ -127,7 +169,7 @@ wait(pid_t pid UNUSED)
     opening the new file is a separate operation which would require a open system call.
 */
 bool
-create(const char* file UNUSED, unsigned initial_size UNUSED)
+create(const char* file, unsigned initial_size)
 {
     return false;
     // TODO
@@ -140,7 +182,7 @@ create(const char* file UNUSED, unsigned initial_size UNUSED)
     See Removing an Open File, for details.
 */
 bool
-remove(const char* file UNUSED)
+remove(const char* file)
 {
     return false;
     // TODO
@@ -161,7 +203,7 @@ remove(const char* file UNUSED)
     in separate calls to close and they do not share a file position.
 */
 int
-open(const char* file UNUSED)
+open(const char* file)
 {
     return 0;
     // TODO
@@ -172,7 +214,7 @@ open(const char* file UNUSED)
     Returns the size, in bytes, of the file open as fd.
 */
 int
-filesize(int fd UNUSED)
+filesize(int fd)
 {
     return 0;
     // TODO
@@ -186,7 +228,7 @@ filesize(int fd UNUSED)
     Fd 0 reads from the keyboard using input_getc().
 */
 int
-read(int fd UNUSED, void* buffer UNUSED, unsigned size UNUSED)
+read(int fd, void* buffer, unsigned size)
 {
     return 0;
     // TODO
@@ -207,7 +249,7 @@ read(int fd UNUSED, void* buffer UNUSED, unsigned size UNUSED)
     confusing both human readers and our grading scripts.
 */
 int
-write(int fd UNUSED, const void* buffer UNUSED, unsigned size UNUSED)
+write(int fd, const void* buffer, unsigned size)
 {
     return 0;
     // TODO
@@ -222,7 +264,7 @@ write(int fd UNUSED, const void* buffer UNUSED, unsigned size UNUSED)
     These semantics are implemented in the file system and do not require any special effort in system call implementation.
 */
 void
-seek(int fd UNUSED, unsigned position UNUSED)
+seek(int fd, unsigned position)
 {
     // TODO
 }
@@ -231,7 +273,7 @@ seek(int fd UNUSED, unsigned position UNUSED)
     Returns the position of the next byte to be read or written in open file fd, expressed in bytes from the beginning of the file.
 */
 unsigned
-tell(int fd UNUSED)
+tell(int fd)
 {
     return 0;
     // TODO
@@ -242,7 +284,7 @@ tell(int fd UNUSED)
     as if by calling this function for each one.
 */
 void
-close(int fd UNUSED)
+close(int fd)
 {
     // TODO
 }
