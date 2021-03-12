@@ -1,4 +1,6 @@
 #include "userprog/syscall.h"
+#include "threads/synch.h"
+
 #define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
 #define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
 #define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
@@ -251,6 +253,26 @@ read(int fd, void* buffer, unsigned size)
 int
 write(int fd, const void* buffer, unsigned size)
 {
+    #define MAX_CONSOLE_SIZE 200
+
+    // Write to the console
+    if (fd == STDOUT_FILENO)
+    {
+        int bufferOffset = 0;
+        // Break into chunks of 200
+        while (bufferOffset < size)
+        {
+            if ( (size - bufferOffset) > MAX_CONSOLE_SIZE)
+            {
+                putbuf( (buffer + bufferOffset), MAX_CONSOLE_SIZE );
+            }
+            else
+            {
+                putbuf( (buffer + bufferOffset), (size - bufferOffset) );
+            }            
+            bufferOffset += MAX_CONSOLE_SIZE;
+        }
+    }
     return 0;
     // TODO
 }
