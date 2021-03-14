@@ -75,6 +75,9 @@ start_process (void *file_name_)
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
+  else {
+
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -96,12 +99,24 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid /*UNUSED*/)
 {
+    /*
     while(true)
     {
         thread_yield();
+    }*/
+
+    //Find process referred to by child_tid
+    struct thread *child = find_thread(child_tid);
+    if (child) {
+        sema_down(&(child->process_wait_sema));
+        return 0;
     }
+    else {
+        return -1;
+    }
+
 }
 
 /* Free the current process's resources. */
@@ -227,13 +242,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
     char **argv;
     char *tok;
     char *fn_copyForArgs;
+    int i = 0;
     fn_copyForArgs = palloc_get_page (0);
     strlcpy (fn_copyForArgs, file_name, PGSIZE);
     argv = (char **) palloc_get_page (0);
     while ((tok = strtok_r(fn_copyForArgs," ", &fn_copyForArgs))) {
         argc++;
-        *argv = tok;
-        argv++;
+        argv[i] = tok;
+        i++;
     }
 
     struct thread *t = thread_current ();
@@ -241,7 +257,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   struct file *file = NULL;
   off_t file_ofs;
   bool success = false;
-  int i;
+    i = 0;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -250,10 +266,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (argv[0]);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", file_name);
+      printf ("load: %s: open failed\n", argv[0]);
       goto done; 
     }
 
@@ -457,6 +473,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (int argc, char **argv, void **esp)
 {
+
+    printf("Starting setup_stack\n");
   uint8_t *kpage;
   bool success = false;
 
@@ -469,37 +487,42 @@ setup_stack (int argc, char **argv, void **esp)
           int argv_address[argc+1];
           argv_address[argc] = NULL;
           int len;
-          for (int i=argc - 1; i >= 0; i--) {
+          for (int i=argc-1; i >= 0; i--) {
               len = strlen(argv[i]) + 1;
-              *esp -= len;
-              memcpy(*esp,argv[i],len);
-              argv_address[i] = (int) esp;
+              esp -= len;
+              memcpy(esp,argv[i],len);
+              argv_address[i] = (int)esp;
           }
-
+          //hex_dump(esp, esp, PHYS_BASE-*esp ,true);
           //Word-align to 4 bytes
           while((int) esp % 4 != 0) {
-              esp--;
+            esp--;
           }
-          memset(*esp, 0, sizeof(int));
 
+          //hex_dump(esp, esp, PHYS_BASE-*esp ,true);
+          esp -= 4 - (strlen(argv[0]) + 1) % 4;
 
           //Push the addresses of the pointers to the arguments
           for (int i = argc - 1; i >= 0; i--) {
-              *esp -= sizeof(char *);
-              memcpy(*esp, argv_address[i], sizeof(char *));
+              esp -= sizeof(int);
+              memcpy(esp, argv_address[i], sizeof(int));
           }
 
-          //Push the address of argv[0].
-          *esp -= sizeof (char **);
-          memcpy (*esp, argv[0], sizeof (char **));
-
+          //Push the address of argv[0]
+          void *ptr_to_argv = esp;
+          esp -= sizeof(void *);
+          memcpy(esp, &ptr_to_argv,sizeof(void *));
+          //hex_dump(esp, esp, PHYS_BASE-*esp ,true);
           //Push the number of arguments i.e. argc
-          *esp -= sizeof (int);
-          *(int *)(*esp) = argc;
+          esp -= sizeof(int);
+          *(int *)(esp) = argc;
+
           //Push a fake return address
-          *esp -= sizeof (void*);
-          *(int *)(*esp) = 0;
-            //hex_dump();
+          esp -= sizeof(int);
+          *(int *)(esp) = 0;
+
+          hex_dump(esp, esp, PHYS_BASE-*esp ,true);
+
       }
       else
         palloc_free_page (kpage);
