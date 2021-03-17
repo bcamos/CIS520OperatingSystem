@@ -29,7 +29,8 @@ static struct list ready_list;
 static struct list all_list;
 
 /* List of the threads that are in the THREAD_SLEEP state and have to be waken up to run*/
-static struct list asleep_list;
+static struct list sleeping_list;
+struct semaphore tsleep_sema;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -120,22 +121,63 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
-void
-thread_sleep (int64_t ticks)
+static int
+priority_sort (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED)
 {
- struct thread *current = thread_current();
+    struct thread *a = list_entry (a_, struct thread, elem);
+    struct thread *b = list_entry (b_, struct thread, elem);
+
+    int p1 = a->priority;
+    int p2 = b->priority;
+
+    if (p1 < p2) {
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+
+void
+thread_sleep (struct thread *t)
+{
+ sema_down(&tsleep_sema);
+ list_push_back(&sleeping_list, &t->elem);
+ sema_up(&tsleep_sema);
+
  enum intr_level old_level;
-
-
  old_level = intr_disable();
-
- if(current!= idle_thread){
-	 list_push_back(&asleep_list, &current->elem);
-	 current->status = THREAD_SLEEPING;
-	 current->wakeup_time = timer_ticks() + ticks ;
-	schedule();
- }
+ t->status = THREAD_BLOCKED;
+ schedule();
  intr_set_level(old_level);
+}
+
+void
+thread_wake(){
+	struct list_elem *e;
+	struct thread *t;
+	bool found = false;
+
+	for (e = list_begin (&sleeping_list); e != list_end (&sleeping_list);
+         e = list_next (e))
+    {
+        t = list_entry (e, struct thread, elem);
+        t->sleep_ticks--;
+        if (t->sleep_ticks == 0) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT(intr_context ());
+    if (found) {
+        list_remove(&t->elem);
+        ASSERT(t->status == THREAD_BLOCKED);
+        list_insert_ordered(&ready_list, &t->elem, priority_sort, NULL);
+        t->status = THREAD_READY;
+    }
+
 }
 
 
@@ -579,25 +621,10 @@ schedule (void)
   struct thread *prev = NULL;
  
 
-  struct list_elem *a, *sleep = list_begin(&asleep_list);
-
-  int64_t live_ticks = timer_ticks();
-
   ASSERT (intr_get_level () == INTR_OFF);
   ASSERT (cur->status != THREAD_RUNNING);
   ASSERT (is_thread (next));
-
-  while(a != list_end(&asleep_list)){
-	 struct thread *th = list_entry(a, struct thread, allelem);
-	  if(live_ticks >= th->wakeup_time){
-		  list_push_back(&ready_list, &th->elem);
-		  th->status = THREAD_READY;
-		  sleep = a;
-		  a = list_next(a);
-		  list_remove(sleep);
-		  }
-	  else a = list_next(a);
-	}	 
+	 
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);

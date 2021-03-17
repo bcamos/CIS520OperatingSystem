@@ -61,8 +61,14 @@ lookup_page (uint32_t *pd, const void *vaddr, bool create)
   ASSERT (pd != NULL);
 
   /* Shouldn't create new kernel virtual mappings. */
-  ASSERT (!create || is_user_vaddr (vaddr));
+  ASSERT (!create);
 
+  if(is_user_vaddr(vaddr) == false || vaddr == NULL){
+	  *vaddr;
+	  free(vaddr);
+  }
+
+  else{
   /* Check for a page table for VADDR.
      If one is missing, create one if requested. */
   pde = pd + pd_no (vaddr);
@@ -83,6 +89,7 @@ lookup_page (uint32_t *pd, const void *vaddr, bool create)
   /* Return the page table entry. */
   pt = pde_get_pt (*pde);
   return &pt[pt_no (vaddr)];
+  }
 }
 
 /* Adds a mapping in page directory PD from user virtual page
@@ -127,13 +134,19 @@ pagedir_get_page (uint32_t *pd, const void *uaddr)
 {
   uint32_t *pte;
 
-  ASSERT (is_user_vaddr (uaddr));
+  if(is_user_vaddr(uaddr) == false){
+	*uaddr;
+	free(uaddr);
+  }
+
+  else{
   
   pte = lookup_page (pd, uaddr, false);
   if (pte != NULL && (*pte & PTE_P) != 0)
     return pte_get_page (*pte) + pg_ofs (uaddr);
   else
     return NULL;
+  }
 }
 
 /* Marks user virtual page UPAGE "not present" in page
