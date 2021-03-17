@@ -351,13 +351,13 @@ Attach debugger to a waiting pintos process on the same machine.
 Shorthand for @code{target remote localhost:1234}.
 @end deffn
 
-@deffn {GDB Macro} dumplist list type element
+@deffn {GDB Macro} dumplist &list type element
 Prints the elements of @var{list}, which should be a @code{struct} list
 that contains elements of the given @var{type} (without the word
 @code{struct}) in which @var{element} is the @struct{list_elem} member
 that links the elements.
 
-Example: @code{dumplist all_list thread allelem} prints all elements of
+Example: @code{dumplist &all_list thread allelem} prints all elements of
 @struct{thread} that are linked in @code{struct list all_list} using the
 @code{struct list_elem allelem} which is part of @struct{thread}.
 @end deffn
@@ -376,14 +376,14 @@ which the threads are kept.  Specify @var{element} as the
 @struct{list_elem} field used inside @struct{thread} to link the threads
 together.
 
-Example: @code{btthreadlist all_list allelem} shows the backtraces of
+Example: @code{btthreadlist &all_list allelem} shows the backtraces of
 all threads contained in @code{struct list all_list}, linked together by
 @code{allelem}.  This command is useful to determine where your threads
 are stuck when a deadlock occurs.  Please see the example scenario below.
 @end deffn
 
 @deffn {GDB Macro} btthreadall
-Short-hand for @code{btthreadlist all_list allelem}.
+Short-hand for @code{btthreadlist &all_list allelem}.
 @end deffn
 
 @deffn {GDB Macro} btpagefault
