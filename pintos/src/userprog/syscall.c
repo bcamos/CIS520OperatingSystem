@@ -16,16 +16,11 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {    
-    /*
-        ASSUMPTION: from syscall interface in lib/user looks like stack is organized:
-            +12  -> arg2
-            +8   -> arg1
-            +4   -> arg0
-            esp  -> NUM (status code)
-
-        I haven't debugged and confirmed this yet... -- and offsets might not be exact if the arg takes more than 4 bytes... - (Ben)
-    */
     uint8_t* status = (uint8_t*) f->esp; // Get callers first argument from stack pointer
+    if (status >= PHYS_BASE)
+    {
+        exit(-1);
+    }
 
     // TODO Handle cases
     switch (*status)
@@ -85,9 +80,6 @@ syscall_handler (struct intr_frame *f UNUSED)
         default:
             break;
     }
-
-    printf("system call!\n");
-    thread_exit ();
 }
 
 /*
@@ -97,7 +89,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 void
 halt(void)
 {   
-    // TODO
+    shutdown_power_off();
 }
 
 /*
@@ -108,7 +100,8 @@ halt(void)
 void
 exit(int status)
 {
-    // TODO
+    printf("%s: exit(%d)", thread_current()->name, status);
+    process_exit();
 }
 
 /*

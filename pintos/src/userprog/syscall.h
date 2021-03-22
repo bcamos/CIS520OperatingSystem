@@ -5,6 +5,10 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "threads/init.h"
+#include "devices/shutdown.h"
+#include "process.h"
 
 /* Process identifier. */
 typedef int pid_t;
