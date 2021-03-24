@@ -101,21 +101,22 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid /*UNUSED*/)
 {
-    /*
+    
     while(true)
     {
         thread_yield();
-    }*/
+    }
+    return -1;
 
     //Find process referred to by child_tid
-    struct thread *child = find_thread(child_tid);
+    /*struct thread *child = find_thread(child_tid);
     if (child) {
         sema_down(&(child->process_wait_sema));
         return 0;
     }
     else {
         return -1;
-    }
+    }*/
 
 }
 
@@ -477,6 +478,7 @@ setup_stack (int argc, char **argv, void **esp)
     printf("Starting setup_stack\n");
   uint8_t *kpage;
   bool success = false;
+  int i = 0;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -487,42 +489,40 @@ setup_stack (int argc, char **argv, void **esp)
           int argv_address[argc+1];
           argv_address[argc] = NULL;
           int len;
-          for (int i=argc-1; i >= 0; i--) {
+          for (i=argc-1; i >= 0; i--) {
               len = strlen(argv[i]) + 1;
-              esp -= len;
-              memcpy(esp,argv[i],len);
-              argv_address[i] = (int)esp;
+              *esp -= len;
+              memcpy(*esp,argv[i],len);
+              argv_address[i] = (int)*esp;
           }
           //hex_dump(esp, esp, PHYS_BASE-*esp ,true);
           //Word-align to 4 bytes
-          while((int) esp % 4 != 0) {
-            esp--;
+          while(((int)*esp) % 4 != 0) {
+             *esp -= sizeof(char);
           }
 
           //hex_dump(esp, esp, PHYS_BASE-*esp ,true);
-          esp -= 4 - (strlen(argv[0]) + 1) % 4;
+          //*esp -= 4 - (strlen(argv[0]) + 1) % 4;
+          *esp -= sizeof(int);
 
           //Push the addresses of the pointers to the arguments
-          for (int i = argc - 1; i >= 0; i--) {
-              esp -= sizeof(int);
-              memcpy(esp, argv_address[i], sizeof(int));
+          for ( i = argc - 1; i >= 0; i--) {
+              *esp -= sizeof(int);
+              memcpy(*esp, argv_address[i], sizeof(int));
           }
 
           //Push the address of argv[0]
-          void *ptr_to_argv = esp;
-          esp -= sizeof(void *);
-          memcpy(esp, &ptr_to_argv,sizeof(void *));
+          void *ptr_to_argv = *esp;
+          *esp -= sizeof(int);
+          memcpy(*esp, &ptr_to_argv,sizeof(void *));
           //hex_dump(esp, esp, PHYS_BASE-*esp ,true);
           //Push the number of arguments i.e. argc
-          esp -= sizeof(int);
-          *(int *)(esp) = argc;
+          *esp -= sizeof(int);
+          memcpy(*esp, &argc, sizeof(int));          
 
-          //Push a fake return address
-          esp -= sizeof(int);
-          *(int *)(esp) = 0;
-
-          hex_dump(esp, esp, PHYS_BASE-*esp ,true);
-
+          *esp -= sizeof(int);
+          int zero = 0;
+          memcpy(*esp, &zero, sizeof(int));
       }
       else
         palloc_free_page (kpage);
