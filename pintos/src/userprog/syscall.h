@@ -9,6 +9,7 @@
 #include "threads/init.h"
 #include "devices/shutdown.h"
 #include "process.h"
+#include "threads/synch.h"
 
 /* Process identifier. */
 typedef int pid_t;
@@ -29,5 +30,9 @@ int write(int fd, const void* buffer, unsigned length);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
+
+struct lock file_lock;
+#define lock_files() (lock_acquire(&file_lock))
+#define unlock_files() (lock_release(&file_lock))
 
 #endif /* userprog/syscall.h */

@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include "threads/synch.h"
+#include "filesys/file.h"
 
 #define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
 #define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
@@ -34,35 +35,35 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         case SYS_EXEC:
-            exec ( arg0(char*, status) );
+            f->eax = exec ( arg0(char*, status) );
             break;
 
         case SYS_WAIT:
-            wait ( arg0(pid_t, status) );
+            f->eax = wait ( arg0(pid_t, status) );
             break;
 
         case SYS_CREATE:
-            create ( arg0(char*, status), arg1(unsigned int, status) );
+            f->eax = create ( arg0(char*, status), arg1(unsigned int, status) );
             break;
 
         case SYS_REMOVE:
-            remove ( arg0(char*, status) );
+            f->eax = remove ( arg0(char*, status) );
             break;
 
         case SYS_OPEN:
-            open ( arg0(char*, status) );
+            f->eax = open ( arg0(char*, status) );
             break;
 
         case SYS_FILESIZE:
-            filesize ( arg0(int, status) );
+            f->eax = filesize ( arg0(int, status) );
             break;
 
         case SYS_READ:
-            read ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
+            f->eax = read ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
         case SYS_WRITE:
-            write ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
+            f->eax = write ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
         case SYS_SEEK:
@@ -70,7 +71,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         case SYS_TELL:
-            tell ( arg0(int, status) );
+            f->eax = tell ( arg0(int, status) );
             break;
 
         case SYS_CLOSE:
@@ -100,8 +101,7 @@ halt(void)
 void
 exit(int status)
 {
-    printf("%s: exit(%d)", thread_current()->name, status);
-    process_exit();
+    
 }
 
 /*
@@ -154,8 +154,7 @@ exec(const char* file)
 int
 wait(pid_t pid)
 {
-    return 0;
-    // TODO
+    return process_wait(pid);
 }
 
 /*
@@ -247,11 +246,16 @@ int
 write(int fd, const void* buffer, unsigned size)
 {
     #define MAX_CONSOLE_SIZE 200
-
+    int bytes_written = 0;
+    if (fd == STDIN_FILENO)
+    {
+        return -1;
+    }
     // Write to the console
-    if (fd == STDOUT_FILENO)
+    else if (fd == STDOUT_FILENO)
     {
         int bufferOffset = 0;
+        lock_files();
         // Break into chunks of 200
         while (bufferOffset < size)
         {
@@ -265,9 +269,33 @@ write(int fd, const void* buffer, unsigned size)
             }            
             bufferOffset += MAX_CONSOLE_SIZE;
         }
+        bytes_written = size;
+        unlock_files();
     }
-    return 0;
-    // TODO
+    else
+    {
+        struct thread *cur = thread_current();
+        struct thread_file_container *file_container;
+        struct list_elem *file_elem = list_front(&cur->my_files);
+        bool found = false;
+        while (found == false && file_elem != list_end(&cur->my_files))
+        {
+            file_container = list_entry(file_elem, struct thread_file_container, elem);
+            if (file_container->fid == fd)
+            {
+                found = true;
+            }
+            file_elem = list_next(file_elem);
+        }
+        if (found == true)
+        {
+            ASSERT(file_container->fid == fd); // Sanity check;
+            lock_files();
+            bytes_written = file_write(file_container->file, buffer, size);
+            unlock_files();
+        }
+    }
+    return bytes_written;
 }
 
 /*

@@ -101,9 +101,17 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-
+    struct list my_files;
+    int next_fid;
     struct semaphore process_wait_sema;
   };
+
+struct thread_file_container
+{
+    struct file* file;
+    int fid;
+    struct list_elem elem;
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

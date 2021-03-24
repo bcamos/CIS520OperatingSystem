@@ -488,6 +488,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->next_fid = 2;
+  list_init(&t->my_files);
   list_push_back (&all_list, &t->allelem);
 }
 
