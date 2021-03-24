@@ -152,4 +152,6 @@ int thread_get_load_avg (void);
 
 struct thread * find_thread(tid_t tid);
 int next_fid(struct thread *t);
+void lock_thread(struct thread* t);
+void unlock_thread(struct thread* t);
 #endif /* threads/thread.h */

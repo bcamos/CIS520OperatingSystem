@@ -468,11 +468,21 @@ find_thread(tid_t tid) {
 
 int next_fid(struct thread* t)
 {
-    lock_acquire(&t->my_lock);
+    lock_thread(t);
     int fid = t->next_fid;
     t->next_fid++;
-    lock_release(&t->my_lock);
+    unlock_thread(t);
     return fid;
+}
+
+void lock_thread(struct thread* t)
+{
+    lock_acquire(&t->my_lock);
+}
+
+void unlock_thread(struct thread* t)
+{
+    lock_release(&t->my_lock);
 }
 
 /* Returns true if T appears to point to a valid thread. */

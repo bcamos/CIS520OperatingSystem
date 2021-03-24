@@ -212,7 +212,9 @@ open(const char* file)
         struct thread_file_container* file_container = (struct thread_file_container*)malloc(sizeof(struct thread_file_container));
         file_container->file = opened_file;
         file_container->fid = next_fid(cur);
+        lock_thread(cur);
         list_push_back(&cur->my_files, &file_container->elem);
+        unlock_thread(cur);
         return file_container->fid;
     }
     else
@@ -367,7 +369,9 @@ close(int fd)
             lock_files();
             file_close(file_container->file);
             unlock_files();
+            lock_thread(cur);
             list_remove(file_elem);
+            unlock_thread(cur);
             free(file_container);
         }
     }
