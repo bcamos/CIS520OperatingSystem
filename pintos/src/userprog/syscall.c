@@ -157,7 +157,7 @@ exec(const char* file)
 int
 wait(pid_t pid)
 {
-    return process_wait(pid);
+    return process_wait(pid); // TODO
 }
 
 /*
@@ -286,7 +286,7 @@ write(int fd, const void* buffer, unsigned size)
         bytes_written = size;        
         unlock_files();
     }
-    else
+    else if(fd > STDOUT_FILENO)
     {        
         struct thread *cur = thread_current();
         struct thread_file_container *file_container;
@@ -343,5 +343,31 @@ tell(int fd)
 void
 close(int fd)
 {
-    // TODO
+    if (fd > STDOUT_FILENO)
+    {
+        struct thread* cur = thread_current();
+        struct thread_file_container* file_container;
+        struct list_elem* file_elem = list_front(&cur->my_files);
+        bool found = false;
+        while (found == false && file_elem != list_end(&cur->my_files))
+        {
+            file_container = list_entry(file_elem, struct thread_file_container, elem);
+            if (file_container->fid == fd)
+            {
+                found = true;
+            }
+            else
+            {
+                file_elem = list_next(file_elem);
+            }            
+        }
+        if (found == true)
+        {
+            ASSERT(file_container->fid == fd); // Sanity check;
+            lock_files();
+            file_close(file_container->file);
+            unlock_files();
+            list_remove(file_elem);
+        }
+    }
 }
