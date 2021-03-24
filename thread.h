@@ -104,6 +104,7 @@ struct thread
     struct list my_files;
     int next_fid;
     struct semaphore process_wait_sema;
+    struct lock my_lock;
   };
 
 struct thread_file_container
@@ -150,4 +151,5 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 struct thread * find_thread(tid_t tid);
+int next_fid(struct thread *t);
 #endif /* threads/thread.h */

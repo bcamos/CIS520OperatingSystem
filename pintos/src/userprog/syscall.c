@@ -1,6 +1,8 @@
 #include "userprog/syscall.h"
 #include "threads/synch.h"
 #include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "threads/malloc.h"
 
 #define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
 #define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
@@ -199,8 +201,23 @@ remove(const char* file)
 int
 open(const char* file)
 {
-    return 0;
-    // TODO
+    /* Took inspiration from: https://github.com/MohamedSamirShabaan/Pintos-Project-2/blob/master/src/userprog/syscall.c */
+    lock_files();
+    struct file* opened_file = filesys_open( file );
+    unlock_files();
+    if (opened_file != NULL)
+    {
+        struct thread* cur = thread_current();
+        struct thread_file_container* file_container = (struct thread_file_container*)malloc(sizeof(struct thread_file_container));
+        file_container->file = opened_file;
+        file_container->fid = next_fid(cur);
+        list_push_back(&cur->my_files, &file_container->elem);
+        return file_container->fid;
+    }
+    else
+    {
+        return -1;
+    }    
 }
 
 
@@ -247,12 +264,8 @@ write(int fd, const void* buffer, unsigned size)
 {
     #define MAX_CONSOLE_SIZE 200
     int bytes_written = 0;
-    if (fd == STDIN_FILENO)
-    {
-        return -1;
-    }
     // Write to the console
-    else if (fd == STDOUT_FILENO)
+    if (fd == STDOUT_FILENO)
     {
         int bufferOffset = 0;
         lock_files();

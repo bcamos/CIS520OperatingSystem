@@ -466,6 +466,15 @@ find_thread(tid_t tid) {
     }
 }
 
+int next_fid(struct thread* t)
+{
+    lock_acquire(&t->my_lock);
+    int fid = t->next_fid;
+    t->next_fid++;
+    lock_release(&t->my_lock);
+    return fid;
+}
+
 /* Returns true if T appears to point to a valid thread. */
 static bool
 is_thread (struct thread *t)
@@ -490,6 +499,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->next_fid = 2;
   list_init(&t->my_files);
+  lock_init(&t->my_lock);
   list_push_back (&all_list, &t->allelem);
 }
 
