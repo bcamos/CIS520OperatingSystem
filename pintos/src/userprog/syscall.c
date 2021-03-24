@@ -13,7 +13,8 @@ static void syscall_handler (struct intr_frame *);
 void
 syscall_init (void) 
 {
-  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+    lock_init(&file_lock);
+    intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static void
@@ -23,7 +24,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     if (status >= PHYS_BASE)
     {
         exit(-1);
-    }
+    }    
 
     // TODO Handle cases
     switch (*status)
@@ -64,7 +65,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             f->eax = read ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
-        case SYS_WRITE:
+        case SYS_WRITE:            
             f->eax = write ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
@@ -263,12 +264,12 @@ int
 write(int fd, const void* buffer, unsigned size)
 {
     #define MAX_CONSOLE_SIZE 200
-    int bytes_written = 0;
+    int bytes_written = 0;    
     // Write to the console
     if (fd == STDOUT_FILENO)
     {
-        int bufferOffset = 0;
-        lock_files();
+        int bufferOffset = 0;        
+        lock_files();        
         // Break into chunks of 200
         while (bufferOffset < size)
         {
@@ -282,11 +283,11 @@ write(int fd, const void* buffer, unsigned size)
             }            
             bufferOffset += MAX_CONSOLE_SIZE;
         }
-        bytes_written = size;
+        bytes_written = size;        
         unlock_files();
     }
     else
-    {
+    {        
         struct thread *cur = thread_current();
         struct thread_file_container *file_container;
         struct list_elem *file_elem = list_front(&cur->my_files);
