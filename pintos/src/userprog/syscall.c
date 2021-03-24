@@ -368,6 +368,7 @@ close(int fd)
             file_close(file_container->file);
             unlock_files();
             list_remove(file_elem);
+            free(file_container);
         }
     }
 }
