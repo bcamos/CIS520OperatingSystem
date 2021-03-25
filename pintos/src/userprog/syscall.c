@@ -82,6 +82,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         default:
+            exit(-1);
             break;
     }
 }
@@ -104,6 +105,7 @@ halt(void)
 void
 exit(int status)
 {
+    printf("%s: exit(%d)\n", thread_current()->name, status);
     thread_exit();
 }
 

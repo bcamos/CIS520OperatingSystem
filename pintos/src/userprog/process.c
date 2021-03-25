@@ -101,22 +101,22 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid /*UNUSED*/)
 {
-    
-    while(true)
+    //return -1;
+   /* while(true)
     {
         thread_yield();
     }
-    return -1;
+    return -1;*/
 
     //Find process referred to by child_tid
-    /*struct thread *child = find_thread(child_tid);
-    if (child) {
+    struct thread *child = find_thread(child_tid);    
+    if (child != NULL) {
         sema_down(&(child->process_wait_sema));
         return 0;
     }
     else {
         return -1;
-    }*/
+    }
 
 }
 
