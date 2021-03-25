@@ -242,12 +242,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
     int argc = 0;
     char **argv;
     char *tok;
-    char *fn_copyForArgs;
+    char *fn_copyForArgs, *pos, *executable;
     int i = 0;
     fn_copyForArgs = palloc_get_page (0);
     strlcpy (fn_copyForArgs, file_name, PGSIZE);
     argv = (char **) palloc_get_page (0);
-    while ((tok = strtok_r(fn_copyForArgs," ", &fn_copyForArgs))) {
+    executable = strtok_r(fn_copyForArgs, " ", &pos);
+    
+    for ( tok = strtok_r(NULL, " ", &pos); tok != NULL; tok = strtok_r(NULL," ", &pos) )
+    {
         argc++;
         argv[i] = tok;
         i++;
@@ -267,10 +270,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (argv[0]);
+  file = filesys_open (executable);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", argv[0]);
+      printf ("load: %s: open failed\n", executable);
       goto done; 
     }
 
@@ -475,10 +478,10 @@ static bool
 setup_stack (int argc, char **argv, void **esp)
 {
 
-    printf("Starting setup_stack\n");
+  printf("Starting setup_stack\n");
   uint8_t *kpage;
   bool success = false;
-  int i = 0;
+  int i = 0;  
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -522,7 +525,7 @@ setup_stack (int argc, char **argv, void **esp)
 
           *esp -= sizeof(int);
           int zero = 0;
-          memcpy(*esp, &zero, sizeof(int));
+          memcpy(*esp, &argv[argc], sizeof(int));
       }
       else
         palloc_free_page (kpage);
