@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <threads/synch.h>
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -23,8 +24,6 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-#define DONATION_MAX 10
-#define INVALID_INDEX -1
 
 /* A kernel thread or user process.
 
@@ -90,11 +89,6 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    int saved_priority;                 /* True priority if donated */
-    int donations[DONATION_MAX];        /* stack of all priority donations */
-    int donation_index;                 /* start index */    
-    bool contains_donated;              /* whether the thread contains a donated priority */
-    struct lock* lock_blocked_by;       /* a the thread is blocked by */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -107,8 +101,18 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-    int64_t sleep_ticks;
+    struct list my_files;
+    int next_fid;
+    struct semaphore process_wait_sema;
+    struct lock my_lock;
   };
+
+struct thread_file_container
+{
+    struct file* file;
+    int fid;
+    struct list_elem elem;
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -127,9 +131,6 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 void thread_block (void);
 void thread_unblock (struct thread *);
 
-void thread_sleep(struct thread* t);
-void thread_wake(void);
-
 struct thread *thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);
@@ -143,15 +144,14 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
-void donate_priority_to(struct thread *to, int new_priority);
-void restore_donated_priority(struct thread *t);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-bool is_thread_priority_less(const struct list_elem* a, const struct list_elem* b, void* aux);
-void insert_thread(struct list* queue, struct thread* t);
-
+struct thread * find_thread(tid_t tid);
+int next_fid(struct thread *t);
+void lock_thread(struct thread* t);
+void unlock_thread(struct thread* t);
 #endif /* threads/thread.h */
