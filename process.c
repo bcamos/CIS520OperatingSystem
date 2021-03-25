@@ -242,14 +242,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
     int argc = 0;
     char **argv;
     char *tok;
-    char *fn_copyForArgs, *pos, *executable;
+    char *fn_copyForArgs, *pos;
     int i = 0;
     fn_copyForArgs = palloc_get_page (0);
     strlcpy (fn_copyForArgs, file_name, PGSIZE);
-    argv = (char **) palloc_get_page (0);
-    executable = strtok_r(fn_copyForArgs, " ", &pos);
+    argv = (char **) palloc_get_page (0);    
     
-    for ( tok = strtok_r(NULL, " ", &pos); tok != NULL; tok = strtok_r(NULL," ", &pos) )
+    for ( tok = strtok_r(fn_copyForArgs, " ", &pos); tok != NULL; tok = strtok_r(NULL," ", &pos) )
     {
         argc++;
         argv[i] = tok;
@@ -270,10 +269,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (executable);
+  file = filesys_open (argv[0]);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", executable);
+      printf ("load: %s: open failed\n", argv[0]);
       goto done; 
     }
 
@@ -511,21 +510,21 @@ setup_stack (int argc, char **argv, void **esp)
           //Push the addresses of the pointers to the arguments
           for ( i = argc - 1; i >= 0; i--) {
               *esp -= sizeof(int);
-              memcpy(*esp, argv_address[i], sizeof(int));
+              memcpy(*esp, &argv_address[i], sizeof(int));
           }
 
           //Push the address of argv[0]
           void *ptr_to_argv = *esp;
           *esp -= sizeof(int);
           memcpy(*esp, &ptr_to_argv,sizeof(void *));
-          //hex_dump(esp, esp, PHYS_BASE-*esp ,true);
+          
           //Push the number of arguments i.e. argc
           *esp -= sizeof(int);
           memcpy(*esp, &argc, sizeof(int));          
 
           *esp -= sizeof(int);
           int zero = 0;
-          memcpy(*esp, &argv[argc], sizeof(int));
+          memcpy(*esp, &argv[argc], sizeof(int));                   
       }
       else
         palloc_free_page (kpage);
