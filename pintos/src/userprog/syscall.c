@@ -337,13 +337,14 @@ open(const char* file)
 int
 filesize(int fd)
 {
-    if (list_empty(&thread_current()->my_files))
+    struct thread* t = thread_current();
+    if (list_empty(&t->my_files))
     {
         unlock_files();
         return -1;
     }
     struct list_elem *temp;
-    for (temp = list_front(&thread_current()->my_files); temp != list_end(temp); temp = list_next(temp))
+    for (temp = list_front(&t->my_files); temp != list_end(&t->my_files); temp = list_next(temp))
     {
         struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
         if (f->fid == fd)
@@ -388,7 +389,7 @@ read(int fd, void* buffer, unsigned size)
     }
     else
     {
-        for (temp = list_front(&thread_current()->my_files); temp != list_end(temp); temp = list_next(temp))
+        for (temp = list_front(&thread_current()->my_files); temp != list_end(&thread_current()->my_files); temp = list_next(temp))
         {
             struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
 
@@ -493,7 +494,7 @@ seek(int fd, unsigned position)
 
     if (list_empty(&thread_current()->my_files) == false)
     {
-        for (temp = list_front(&thread_current()->my_files); temp != NULL; temp = list_next(temp))
+        for (temp = list_front(&thread_current()->my_files); temp != list_end(&thread_current()->my_files); temp = list_next(temp))
         {
             struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
             if (f->fid == fd)
@@ -522,7 +523,7 @@ tell(int fd)
     {
         return pos;
     }
-    for (item = list_begin(&t->my_files); item != list_end(item) && found == false; item = list_next(item))
+    for (item = list_begin(&t->my_files); item != list_end(&t->my_files) && found == false; item = list_next(item))
     {
         file = list_entry(item, struct thread_file_container, elem);
         if (file->fid == fd)
