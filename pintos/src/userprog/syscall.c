@@ -7,6 +7,7 @@
 #define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
 #define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
 #define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
+#define VALID_PTR_MIN 0x08048000
 
 static void syscall_handler (struct intr_frame *);
 
@@ -21,7 +22,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {    
     uint8_t* status = (uint8_t*) f->esp; // Get callers first argument from stack pointer
-    if (status >= PHYS_BASE)
+    if (status >= PHYS_BASE || status < VALID_PTR_MIN )
     {
         exit(-1);
     }    
