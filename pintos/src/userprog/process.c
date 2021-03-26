@@ -101,24 +101,35 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid /*UNUSED*/)
 {
-    struct list_elem *item;
+    struct list_elem* item;
     struct list* processes = &(thread_current()->my_children_processes);
-    struct thread* child_thread = NULL;
+    struct process_container* child_thread = NULL;
     bool found = false;
     int status = -1;
-    for ( item = list_begin(processes); item != list_end(processes) && found == false; item = list_next(item) )
+
+    if (list_empty(processes) == false)
     {
-        child_thread = list_entry(item, struct thread, parent_elem);
-        if (child_thread->tid == child_tid)
+        item = list_begin(processes);
+        while (item != list_end(processes) && found == false)
         {
-            found = true;
+            child_thread = list_entry(item, struct process_container, elem);
+            if (child_thread->tid == child_tid)
+            {
+                found = true;
+            }
+            else
+            {
+                item = list_next(item);
+            }
         }
     }    
     
     if (child_thread != NULL) 
     {
         sema_down(&(child_thread->waiting_threads));
-        status = thread_current()->child_exit_status;
+        status = child_thread->exit_status;
+        list_remove(item);
+        free(item);
     }
     return status;
 }
@@ -146,6 +157,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  
 }
 
 /* Sets up the CPU for running user code in the current

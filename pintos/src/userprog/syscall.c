@@ -189,7 +189,12 @@ void
 exit(int status)
 {
     printf("%s: exit(%d)\n", thread_current()->name, status);
-    *(thread_current()->exit_status) = status;
+    // check if parent still alive
+    struct thread* parent = find_thread(thread_current()->parent_tid);
+    if (parent != NULL && parent->status != THREAD_DYING)
+    {   
+        thread_current()->self->exit_status = status;           
+    }
     thread_exit();
 }
 

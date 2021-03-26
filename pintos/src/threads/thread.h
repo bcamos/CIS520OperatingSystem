@@ -28,10 +28,9 @@ typedef int tid_t;
 /* Inspired from: https://github.com/st2092/pintos-user-programs/blob/master/src/userprog/syscall.h/*/
 struct process_container
 {
-    tid_t pid;
+    tid_t tid;
     int exit_status;
-    bool is_alive;
-    bool parent_alive;
+    bool is_alive;   
     struct semaphore waiting_threads;
     struct list_elem elem;
 };
@@ -115,14 +114,10 @@ struct thread
     struct list my_files;
     int next_fid;    
     struct list my_children_processes;
-    struct process_container self;
+    int parent_tid;
     struct lock my_lock;
 
-    int child_exit_status;
-    int* exit_status;
-    bool parent_alive;
-    struct semaphore waiting_threads;
-    struct list_elem parent_elem;
+    struct process_container* self;
   };
 
 struct thread_file_container

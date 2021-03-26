@@ -191,8 +191,14 @@ thread_create (const char *name, int priority,
   old_level = intr_disable ();
 
   //add self to parent list
-  list_push_back( &thread_current()->my_children_processes, &t->parent_elem );
-  t->exit_status = &thread_current()->child_exit_status;
+  t->self = (struct process_container*)malloc(sizeof(struct process_container));
+  t->self->is_alive = true;
+  t->self->tid = t->tid;
+  t->self->exit_status = -1;
+  sema_init(&t->self->waiting_threads, 0);
+  list_push_back( &thread_current()->my_children_processes, &t->self->elem );
+  
+  t->parent_tid = thread_current()->tid;
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -303,20 +309,17 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  list_remove (&thread_current()->allelem);
-  struct thread* cur = thread_current();  
-
-  struct list_elem* item;
-  /*for (item = list_begin(&cur->my_children_processes); item != NULL; item = list_next(item))
-  {
-      struct process_container* p = list_entry(item, struct process_container, elem);
-      if (p != NULL)
-      {
-          p->parent_alive = false;
-      }
-  }*/
-  sema_up(&(cur->waiting_threads));
+  struct thread* cur = thread_current();
+  list_remove (&cur->allelem);  
   cur->status = THREAD_DYING;
+
+  struct thread* parent = find_thread(cur->parent_tid);
+  if (parent != NULL && parent->status != THREAD_DYING)
+  {
+      cur->self->is_alive = false;
+      sema_up(&cur->self->waiting_threads);
+  }
+  
   schedule ();
   NOT_REACHED ();
 }
@@ -520,10 +523,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  t->next_fid = 2;  
-  t->parent_alive = true;
-  sema_init(&(t->waiting_threads), 0);  
-  t->child_exit_status = 0;  
+  t->next_fid = 2;
+  
   list_init(&t->my_files);
   list_init(&t->my_children_processes);
   lock_init(&t->my_lock);
