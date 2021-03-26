@@ -15,6 +15,7 @@ static bool check_valid_args(uint8_t* status);
 static bool is_valid_ptr(uint8_t* ptr);
 static bool is_string_in_bounds(const char* str, int maxlength);
 
+
 void
 syscall_init (void) 
 {
@@ -342,7 +343,7 @@ filesize(int fd)
         return -1;
     }
     struct list_elem *temp;
-    for (temp = list_front(&thread_current()->my_files); temp != NULL; temp = list_next(temp))
+    for (temp = list_front(&thread_current()->my_files); temp != list_end(temp); temp = list_next(temp))
     {
         struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
         if (f->fid == fd)
@@ -387,7 +388,7 @@ read(int fd, void* buffer, unsigned size)
     }
     else
     {
-        for (temp = list_front(&thread_current()->my_files); temp != NULL; temp = list_next(temp))
+        for (temp = list_front(&thread_current()->my_files); temp != list_end(temp); temp = list_next(temp))
         {
             struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
 
@@ -512,8 +513,32 @@ seek(int fd, unsigned position)
 unsigned
 tell(int fd)
 {
-    return 0;
-    // TODO
+    struct thread* t = thread_current();
+    struct list_elem *item;
+    struct thread_file_container* file;
+    bool found = false;
+    unsigned pos = 0;
+    if (list_empty(&t->my_files))
+    {
+        return pos;
+    }
+    for (item = list_begin(&t->my_files); item != list_end(item) && found == false; item = list_next(item))
+    {
+        file = list_entry(item, struct thread_file_container, elem);
+        if (file->fid == fd)
+        {
+            bool found = true;
+        }
+    }
+
+    if (found == true)
+    {
+        ASSERT(file->fid == fd) // sanity check
+        lock_files();
+        pos = file_tell(file->file);
+        unlock_files();
+    }
+    return pos;    
 }
 
 /*
