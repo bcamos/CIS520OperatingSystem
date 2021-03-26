@@ -10,6 +10,8 @@
 #define VALID_PTR_MIN 0x08048000
 
 static void syscall_handler (struct intr_frame *);
+static bool check_valid_args(uint8_t* status);
+static bool is_valid_ptr(uint8_t* ptr);
 
 void
 syscall_init (void) 
@@ -18,14 +20,60 @@ syscall_init (void)
     intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+static bool
+check_valid_args(uint8_t *status)
+{   
+    switch (*status)
+    {
+        // 1 arg
+        case SYS_EXIT:
+        case SYS_EXEC:
+        case SYS_WAIT:
+        case SYS_REMOVE:
+        case SYS_OPEN:
+        case SYS_FILESIZE:
+        case SYS_TELL:
+        case SYS_CLOSE:
+            return is_valid_ptr(status + sizeof(int));
+            break;
+
+        // 2 arg
+        case SYS_CREATE:
+        case SYS_SEEK:
+            return is_valid_ptr(status + (sizeof(int) * 2));
+            break;
+
+        // 3 arg
+        case SYS_READ:
+        case SYS_WRITE:
+            return is_valid_ptr(status + (sizeof(int) * 3));
+            break;
+
+        default:
+            return false;
+            break;
+    }
+}
+
+static bool
+is_valid_ptr(uint8_t *ptr)
+{
+    if (ptr >= PHYS_BASE || ptr < VALID_PTR_MIN)
+    {
+        return false;
+    }
+    return true;
+}
+
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {    
     uint8_t* status = (uint8_t*) f->esp; // Get callers first argument from stack pointer
-    if (status >= PHYS_BASE || status < VALID_PTR_MIN )
+    if ( is_valid_ptr(status) == false || check_valid_args(status) == false )
     {
         exit(-1);
-    }    
+    }
+    
 
     // TODO Handle cases
     switch (*status)
