@@ -220,8 +220,10 @@ wait(pid_t pid)
 bool
 create(const char* file, unsigned initial_size)
 {
-    return false;
-    // TODO
+    lock_files();
+    bool file_creation = filesys_create(file, initial_size);
+    unlock_files();
+    return file_creation;
 }
 
 
@@ -282,8 +284,23 @@ open(const char* file)
 int
 filesize(int fd)
 {
-    return 0;
-    // TODO
+    if (list_empty(&thread_current()->my_files))
+    {
+        unlock_files();
+        return -1;
+    }
+    struct list_elem *temp;
+    for (temp = list_front(&thread_current()->my_files); temp != NULL; temp = list_next(temp))
+    {
+        struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
+        if (f->fid == fd)
+        {
+            unlock_files();
+            return file_length(f->file);
+        }
+    }
+    unlock_files();
+    return -1;
 }
 
 
@@ -377,7 +394,24 @@ write(int fd, const void* buffer, unsigned size)
 void
 seek(int fd, unsigned position)
 {
-    // TODO
+    struct list_elem* temp;
+
+    lock_files();
+
+    if (list_empty(&thread_current()->my_files) == false)
+    {
+        for (temp = list_front(&thread_current()->my_files); temp != NULL; temp = list_next(temp))
+        {
+            struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
+            if (f->fid == fd)
+            {
+                file_seek(f->file, position);                
+                break;
+            }
+        }
+    }
+
+    unlock_files();    
 }
 
 /*
