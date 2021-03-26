@@ -284,12 +284,15 @@ create(const char* file, unsigned initial_size)
 bool
 remove(const char* file)
 {
+    bool success = false;
     if (is_valid_ptr(file) == false)
     {
         exit(-1);
-    }
-    return false;
-    // TODO
+    }    
+    lock_files();
+    success = filesys_remove(file);
+    unlock_files();
+    return false;    
 }
 
 
