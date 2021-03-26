@@ -8,10 +8,12 @@
 #define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
 #define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
 #define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
+#define MAX_FILENAME_LENGTH 100
 
 static void syscall_handler (struct intr_frame *);
 static bool check_valid_args(uint8_t* status);
 static bool is_valid_ptr(uint8_t* ptr);
+static bool is_string_in_bounds(const char* str, int maxlength);
 
 void
 syscall_init (void) 
@@ -58,11 +60,42 @@ check_valid_args(uint8_t *status)
 static bool
 is_valid_ptr(uint8_t *ptr)
 {
-    if (ptr >= PHYS_BASE || pagedir_get_page( thread_current()->pagedir, ptr) == NULL)
+    if ( ptr >= PHYS_BASE || pagedir_get_page( thread_current()->pagedir, ptr) == NULL)
     {
         return false;
     }
     return true;
+}
+
+static bool
+is_string_in_bounds(const char* str, int maxlength)
+{
+    int i = 0;    
+    if (maxlength != 0)
+    {
+        while (str[i] != '\0')
+        {
+            // string too long
+            if (i >= maxlength)
+            {
+                return false;
+            }
+            i++;
+        }        
+    }
+    else
+    {
+        while (str[i] != '\0')
+        {
+            // string too long
+            if (is_valid_ptr(str + i) == false)
+            {
+                return false;
+            }
+            i++;
+        }        
+    }
+    return is_valid_ptr(str + i);
 }
 
 static void
@@ -170,13 +203,13 @@ exit(int status)
 pid_t
 exec(const char* file)
 {
-    if (is_valid_ptr(file) == false)
+    if (is_valid_ptr(file) == false )
     {
         exit(-1);
     }
-    lock_files();
+    
     pid_t newProcess_tid = process_execute(file);
-    unlock_files();
+    
     return newProcess_tid;
 }
 
@@ -278,11 +311,11 @@ open(const char* file)
     /* Took inspiration from: https://github.com/MohamedSamirShabaan/Pintos-Project-2/blob/master/src/userprog/syscall.c */
     lock_files();
     struct file* opened_file = filesys_open( file );
-    unlock_files();
+    unlock_files();    
     if (opened_file != NULL)
     {
         struct thread* cur = thread_current();
-        struct thread_file_container* file_container = (struct thread_file_container*)malloc(sizeof(struct thread_file_container));
+        struct thread_file_container* file_container = (struct thread_file_container*)malloc(sizeof(struct thread_file_container));        
         file_container->file = opened_file;
         file_container->fid = next_fid(cur);
         lock_thread(cur);
@@ -332,12 +365,44 @@ filesize(int fd)
 int
 read(int fd, void* buffer, unsigned size)
 {
-    if (is_valid_ptr(buffer) == false)
+    if (is_valid_ptr(buffer) == false )
     {
         exit(-1);
     }
-    return 0;
-    // TODO
+    struct list_elem* temp;
+    int bytes = -1;    
+    if (size <= 0)
+    {
+        return bytes;
+    }
+    if (fd == STDIN_FILENO)
+    {        
+        lock_files();
+        bytes = input_getc();        
+        unlock_files();
+    }
+    else if (fd == STDOUT_FILENO || list_empty(&thread_current()->my_files))
+    {
+        bytes = 0;
+    }
+    else
+    {
+        for (temp = list_front(&thread_current()->my_files); temp != NULL; temp = list_next(temp))
+        {
+            struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
+
+            if (f->fid == fd)
+            {
+                lock_files();
+                bytes = file_read(f->file, buffer, size);
+                unlock_files();
+            }
+        }
+    }    
+
+    
+
+    return bytes;
 }
 
 
@@ -362,6 +427,7 @@ write(int fd, const void* buffer, unsigned size)
         exit(-1);
     }
     #define MAX_CONSOLE_SIZE 200
+    struct thread* cur = thread_current();
     int bytes_written = 0;    
     // Write to the console
     if (fd == STDOUT_FILENO)
@@ -384,9 +450,8 @@ write(int fd, const void* buffer, unsigned size)
         bytes_written = size;        
         unlock_files();
     }
-    else if(fd > STDOUT_FILENO)
-    {        
-        struct thread *cur = thread_current();
+    else if(fd > STDOUT_FILENO && list_empty(&cur->my_files) == false)
+    {       
         struct thread_file_container *file_container;
         struct list_elem *file_elem = list_front(&cur->my_files);
         bool found = false;
