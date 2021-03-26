@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -189,6 +190,10 @@ thread_create (const char *name, int priority,
      member cannot be observed. */
   old_level = intr_disable ();
 
+  //add self to parent list
+  list_push_back( &thread_current()->my_children_processes, &t->parent_elem );
+  t->exit_status = &thread_current()->child_exit_status;
+
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -202,10 +207,7 @@ thread_create (const char *name, int priority,
   /* Stack frame for switch_threads(). */
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
-  sf->ebp = 0;
-
-  // Initialize semaphore with an initial value of 0
-  sema_init (&t->process_wait_sema, 0);
+  sf->ebp = 0;  
 
   intr_set_level (old_level);
 
@@ -302,8 +304,19 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current()->allelem);
-  sema_up(&(thread_current()->process_wait_sema));
-  thread_current ()->status = THREAD_DYING;
+  struct thread* cur = thread_current();  
+
+  struct list_elem* item;
+  /*for (item = list_begin(&cur->my_children_processes); item != NULL; item = list_next(item))
+  {
+      struct process_container* p = list_entry(item, struct process_container, elem);
+      if (p != NULL)
+      {
+          p->parent_alive = false;
+      }
+  }*/
+  sema_up(&(cur->waiting_threads));
+  cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
 }
@@ -454,11 +467,11 @@ running_thread (void)
 struct thread *
 find_thread(tid_t tid) {
 
-    struct list_elem *e;
-    bool found = false;
+    struct list_elem *e;   
     struct thread *the_thread;
 
-    for(e = list_begin((&all_list)); e != list_end((&all_list)); e=list_next(e)) {
+    for(e = list_begin((&all_list)); e != list_end((&all_list)); e=list_next(e)) 
+    {
         the_thread = list_entry(e, struct thread, allelem);
         if(the_thread->tid == tid) {
             return the_thread;
@@ -507,8 +520,12 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  t->next_fid = 2;
+  t->next_fid = 2;  
+  t->parent_alive = true;
+  sema_init(&(t->waiting_threads), 0);  
+  t->child_exit_status = 0;  
   list_init(&t->my_files);
+  list_init(&t->my_children_processes);
   lock_init(&t->my_lock);
   list_push_back (&all_list, &t->allelem);
 }

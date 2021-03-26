@@ -51,7 +51,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR) {
       palloc_free_page(fn_copy);
       palloc_free_page(fn_copyForArgs);
-  }
+  }  
   return tid;
 }
 
@@ -101,23 +101,26 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid /*UNUSED*/)
 {
-    //return -1;
-   /* while(true)
+    struct list_elem *item;
+    struct list* processes = &(thread_current()->my_children_processes);
+    struct thread* child_thread = NULL;
+    bool found = false;
+    int status = -1;
+    for ( item = list_begin(processes); item != list_end(processes) && found == false; item = list_next(item) )
     {
-        thread_yield();
+        child_thread = list_entry(item, struct thread, parent_elem);
+        if (child_thread->tid == child_tid)
+        {
+            found = true;
+        }
+    }    
+    
+    if (child_thread != NULL) 
+    {
+        sema_down(&(child_thread->waiting_threads));
+        status = thread_current()->child_exit_status;
     }
-    return -1;*/
-
-    //Find process referred to by child_tid
-    struct thread *child = find_thread(child_tid);    
-    if (child != NULL) {
-        sema_down(&(child->process_wait_sema));
-        return 0;
-    }
-    else {
-        return -1;
-    }
-
+    return status;
 }
 
 /* Free the current process's resources. */

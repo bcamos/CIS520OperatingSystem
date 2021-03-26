@@ -25,6 +25,17 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+/* Inspired from: https://github.com/st2092/pintos-user-programs/blob/master/src/userprog/syscall.h/*/
+struct process_container
+{
+    tid_t pid;
+    int exit_status;
+    bool is_alive;
+    bool parent_alive;
+    struct semaphore waiting_threads;
+    struct list_elem elem;
+};
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -102,9 +113,16 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
     struct list my_files;
-    int next_fid;
-    struct semaphore process_wait_sema;
+    int next_fid;    
+    struct list my_children_processes;
+    struct process_container self;
     struct lock my_lock;
+
+    int child_exit_status;
+    int* exit_status;
+    bool parent_alive;
+    struct semaphore waiting_threads;
+    struct list_elem parent_elem;
   };
 
 struct thread_file_container
