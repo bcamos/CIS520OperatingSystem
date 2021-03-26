@@ -3,11 +3,11 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "threads/malloc.h"
+#include "userprog/pagedir.h"
 
 #define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
 #define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
 #define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
-#define VALID_PTR_MIN 0x08048000
 
 static void syscall_handler (struct intr_frame *);
 static bool check_valid_args(uint8_t* status);
@@ -58,7 +58,7 @@ check_valid_args(uint8_t *status)
 static bool
 is_valid_ptr(uint8_t *ptr)
 {
-    if (ptr >= PHYS_BASE || ptr < VALID_PTR_MIN)
+    if (ptr >= PHYS_BASE || pagedir_get_page( thread_current()->pagedir, ptr) == NULL)
     {
         return false;
     }
@@ -170,6 +170,10 @@ exit(int status)
 pid_t
 exec(const char* file)
 {
+    if (is_valid_ptr(file) == false)
+    {
+        exit(-1);
+    }
     return 0;
     // TODO
 }
@@ -220,6 +224,10 @@ wait(pid_t pid)
 bool
 create(const char* file, unsigned initial_size)
 {
+    if (is_valid_ptr(file) == false)
+    {
+        exit(-1);
+    }
     lock_files();
     bool file_creation = filesys_create(file, initial_size);
     unlock_files();
@@ -235,6 +243,10 @@ create(const char* file, unsigned initial_size)
 bool
 remove(const char* file)
 {
+    if (is_valid_ptr(file) == false)
+    {
+        exit(-1);
+    }
     return false;
     // TODO
 }
@@ -256,6 +268,11 @@ remove(const char* file)
 int
 open(const char* file)
 {
+    if (is_valid_ptr(file) == false)
+    {
+        exit(-1);
+    }
+
     /* Took inspiration from: https://github.com/MohamedSamirShabaan/Pintos-Project-2/blob/master/src/userprog/syscall.c */
     lock_files();
     struct file* opened_file = filesys_open( file );
@@ -313,6 +330,10 @@ filesize(int fd)
 int
 read(int fd, void* buffer, unsigned size)
 {
+    if (is_valid_ptr(buffer) == false)
+    {
+        exit(-1);
+    }
     return 0;
     // TODO
 }
@@ -334,6 +355,10 @@ read(int fd, void* buffer, unsigned size)
 int
 write(int fd, const void* buffer, unsigned size)
 {
+    if (is_valid_ptr(buffer) == false)
+    {
+        exit(-1);
+    }
     #define MAX_CONSOLE_SIZE 200
     int bytes_written = 0;    
     // Write to the console
