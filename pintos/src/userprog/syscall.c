@@ -174,8 +174,10 @@ exec(const char* file)
     {
         exit(-1);
     }
-    return 0;
-    // TODO
+    lock_files();
+    pid_t newProcess_tid = process_execute(file);
+    unlock_files();
+    return newProcess_tid;
 }
 
 /*
