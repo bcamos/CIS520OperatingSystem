@@ -8,10 +8,10 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -192,6 +192,7 @@ thread_create (const char *name, int priority,
 
   //add self to parent list
   t->self = (struct process_container*)malloc(sizeof(struct process_container));
+  //t->self = palloc_get_page(0);
   t->self->is_alive = true;
   t->self->tid = t->tid;
   t->self->exit_status = -1;
@@ -310,8 +311,7 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
   struct thread* cur = thread_current();
-  list_remove (&cur->allelem);  
-  cur->status = THREAD_DYING;
+  list_remove (&cur->allelem);
 
   struct thread* parent = find_thread(cur->parent_tid);
   if (parent != NULL && parent->status != THREAD_DYING)
@@ -319,7 +319,7 @@ thread_exit (void)
       cur->self->is_alive = false;
       sema_up(&cur->self->waiting_threads);
   }
-  
+  cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
 }
@@ -524,7 +524,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   t->next_fid = 2;
-  
+  t->my_code = NULL;
+
   list_init(&t->my_files);
   list_init(&t->my_children_processes);
   lock_init(&t->my_lock);

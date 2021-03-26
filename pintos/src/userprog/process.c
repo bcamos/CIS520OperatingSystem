@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -129,7 +130,7 @@ process_wait (tid_t child_tid /*UNUSED*/)
         sema_down(&(child_thread->waiting_threads));
         status = child_thread->exit_status;
         list_remove(item);
-        free(item);
+        //free(item);
     }
     return status;
 }
@@ -139,6 +140,15 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
+  
+  if (cur->my_code != NULL)
+  {
+      lock_files();
+      file_allow_write(cur->my_code);
+      file_close(cur->my_code);
+      unlock_files();
+  }  
+  
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
@@ -285,7 +295,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  lock_files();
   file = filesys_open (argv[0]);
+  t->my_code = file;
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", argv[0]);
@@ -375,7 +387,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  if (success)
+  {      
+      file_deny_write(file);      
+  }
+  else
+  {
+      file_close(file);
+  } 
+  unlock_files();
   return success;
 }
 

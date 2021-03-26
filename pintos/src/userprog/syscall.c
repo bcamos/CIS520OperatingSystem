@@ -324,7 +324,8 @@ open(const char* file)
     if (opened_file != NULL)
     {
         struct thread* cur = thread_current();
-        struct thread_file_container* file_container = (struct thread_file_container*)malloc(sizeof(struct thread_file_container));        
+        struct thread_file_container* file_container = (struct thread_file_container*)malloc(sizeof(struct thread_file_container));
+        //struct thread_file_container* file_container = palloc_get_page(0);
         file_container->file = opened_file;
         file_container->fid = next_fid(cur);
         lock_thread(cur);
