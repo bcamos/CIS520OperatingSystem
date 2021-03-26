@@ -456,9 +456,10 @@ tell(int fd)
 void
 close(int fd)
 {
-    if (fd > STDOUT_FILENO)
+    struct thread* cur = thread_current();
+    if (fd > STDOUT_FILENO && list_empty(&cur->my_files) == false)
     {
-        struct thread* cur = thread_current();
+        
         struct thread_file_container* file_container;
         struct list_elem* file_elem = list_front(&cur->my_files);
         bool found = false;
