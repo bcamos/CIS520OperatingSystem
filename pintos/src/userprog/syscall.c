@@ -106,6 +106,7 @@ void
 exit(int status)
 {
     printf("%s: exit(%d)\n", thread_current()->name, status);
+    *(thread_current()->exit_status) = status;
     thread_exit();
 }
 
