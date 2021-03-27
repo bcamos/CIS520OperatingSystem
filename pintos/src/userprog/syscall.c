@@ -291,7 +291,7 @@ remove(const char* file)
     lock_files();
     success = filesys_remove(file);
     unlock_files();
-    return false;    
+    return success;
 }
 
 
