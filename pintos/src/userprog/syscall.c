@@ -106,8 +106,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     if ( is_valid_ptr(status) == false || check_valid_args(status) == false )
     {
         exit(-1);
-    }
-    
+    }    
 
     // TODO Handle cases
     switch (*status)
@@ -136,7 +135,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             f->eax = remove ( arg0(char*, status) );
             break;
 
-        case SYS_OPEN:
+        case SYS_OPEN:            
             f->eax = open ( arg0(char*, status) );
             break;
 
@@ -144,7 +143,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             f->eax = filesize ( arg0(int, status) );
             break;
 
-        case SYS_READ:
+        case SYS_READ:            
             f->eax = read ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
@@ -347,6 +346,7 @@ int
 filesize(int fd)
 {
     struct thread* t = thread_current();
+    lock_files();
     if (list_empty(&t->my_files))
     {
         unlock_files();
@@ -381,37 +381,34 @@ read(int fd, void* buffer, unsigned size)
         exit(-1);
     }
     struct list_elem* temp;
-    int bytes = -1;    
+    int bytes = -1;   
     if (size <= 0)
-    {
+    {        
         return bytes;
     }
     if (fd == STDIN_FILENO)
-    {        
+    {                
         lock_files();
         bytes = input_getc();        
         unlock_files();
     }
     else if (fd == STDOUT_FILENO || list_empty(&thread_current()->my_files))
-    {
+    {        
         bytes = 0;
     }
     else
-    {
+    {        
         for (temp = list_front(&thread_current()->my_files); temp != list_end(&thread_current()->my_files); temp = list_next(temp))
         {
-            struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
-
+            struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);            
             if (f->fid == fd)
-            {
+            {                
                 lock_files();
                 bytes = file_read(f->file, buffer, size);
-                unlock_files();
+                unlock_files();                
             }
         }
-    }    
-
-    
+    }   
 
     return bytes;
 }
