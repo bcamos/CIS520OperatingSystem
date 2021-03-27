@@ -382,9 +382,9 @@ read(int fd, void* buffer, unsigned size)
     }
     struct list_elem* temp;
     int bytes = -1;   
-    if (size <= 0)
+    if (size == 0)
     {        
-        return bytes;
+        return size;
     }
     if (fd == STDIN_FILENO)
     {                
