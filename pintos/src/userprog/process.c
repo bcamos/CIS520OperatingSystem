@@ -127,10 +127,10 @@ process_wait (tid_t child_tid /*UNUSED*/)
     
     if (child_thread != NULL) 
     {
-        sema_down(&(child_thread->waiting_threads));
+        sema_down(&(child_thread->waiting_threads));        
         status = child_thread->exit_status;
         list_remove(item);
-        //free(item);
+        free(child_thread);
     }
     return status;
 }

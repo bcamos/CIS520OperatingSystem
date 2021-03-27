@@ -120,6 +120,7 @@ struct thread
 
     struct process_container* self;
     struct file* my_code;
+    bool is_kernal;
   };
 
 struct thread_file_container

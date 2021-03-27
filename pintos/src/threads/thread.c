@@ -97,6 +97,7 @@ thread_init (void)
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
+  //initial_thread->is_kernal = true;
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
 }
@@ -305,20 +306,22 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
-
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
   struct thread* cur = thread_current();
   list_remove (&cur->allelem);
-
-  struct thread* parent = find_thread(cur->parent_tid);
-  if (parent != NULL && parent->status != THREAD_DYING)
+  
+  if (cur->is_kernal == false)
   {
-      cur->self->is_alive = false;
-      sema_up(&cur->self->waiting_threads);
-  }
+      struct thread* parent = find_thread(cur->parent_tid);
+      if (parent != NULL && parent->status != THREAD_DYING)
+      {
+          cur->self->is_alive = false;
+          sema_up(&cur->self->waiting_threads);
+      }
+  }  
   cur->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -525,6 +528,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->next_fid = 2;
   t->my_code = NULL;
+  t->is_kernal = false;
 
   list_init(&t->my_files);
   list_init(&t->my_children_processes);
