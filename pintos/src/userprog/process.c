@@ -71,9 +71,12 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-  thread_current()->self->loaded_successful = success;
-
-  sema_up(&thread_current()->self->load_sema);
+  struct thread* t = thread_current();
+  if (t != NULL && t->self != NULL)
+  {
+      t->self->loaded_successful = success;
+      sema_up(&t->self->load_sema);
+  }  
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -105,10 +108,11 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid /*UNUSED*/)
 {
-    struct list_elem* item;
-    struct list* processes = &(thread_current()->my_children_processes);
-    struct process_container* child_thread = NULL;
-    bool found = false;
+    //struct list_elem* item;
+    //struct list* processes = &(thread_current()->my_children_processes);
+    struct process_container* child_thread = find_process_container(&thread_current()->my_children_processes, child_tid);
+    int status = -1;
+    /*bool found = false;
     int status = -1;
 
     if (list_empty(processes) == false)
@@ -126,13 +130,13 @@ process_wait (tid_t child_tid /*UNUSED*/)
                 item = list_next(item);
             }
         }
-    }    
+    }    */
     
     if (child_thread != NULL) 
     {
         sema_down(&(child_thread->waiting_threads));        
         status = child_thread->exit_status;
-        list_remove(item);
+        list_remove(&child_thread->elem);
         free(child_thread);
     }
     return status;
@@ -143,7 +147,7 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
-  if (file_lock.holder == cur)
+  if (lock_held_by_current_thread(&file_lock) == true)
   {
       unlock_files();
   }
@@ -305,8 +309,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
     char *fn_copyForArgs, *pos;
     int i = 0;
     fn_copyForArgs = palloc_get_page (0);
+    if (fn_copyForArgs == NULL)
+        return false;
     strlcpy (fn_copyForArgs, file_name, PGSIZE);
     argv = (char **) palloc_get_page (0);
+    if (argv == NULL)
+    {
+        palloc_free_page(fn_copyForArgs);
+        return false;
+    }
+        
     
     for ( tok = strtok_r(fn_copyForArgs, " ", &pos); tok != NULL; tok = strtok_r(NULL," ", &pos) )
     {
@@ -331,7 +343,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. */
   lock_files();
   file = filesys_open (argv[0]);
-  
+  unlock_files();
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", argv[0]);
@@ -423,14 +435,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* We arrive here whether the load is successful or not. */
   if (success)
   {      
-      file_deny_write(file);
       t->my_code = file;
+      file_deny_write(file);      
   }
   else
   {
       file_close(file);
   } 
-  unlock_files();
+  //unlock_files();
+  palloc_free_page(argv);
+  palloc_free_page(fn_copyForArgs);
   return success;
 }
 
@@ -560,10 +574,10 @@ setup_stack (int argc, char **argv, void **esp)
           int argv_address[argc+1];
           argv_address[argc] = NULL;
           int len;
-          for (i=argc-1; i >= 0; i--) {
+          for (i = argc - 1; i >= 0; i--) {
               len = strlen(argv[i]) + 1;
               *esp -= len;
-              memcpy(*esp,argv[i],len);
+              memcpy(*esp, argv[i], len);
               argv_address[i] = (int)*esp;
           }
           //hex_dump(esp, esp, PHYS_BASE-*esp ,true);

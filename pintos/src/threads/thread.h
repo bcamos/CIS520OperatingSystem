@@ -170,6 +170,8 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 struct thread * find_thread(tid_t tid);
+struct process_container* find_process_container(struct list* processes, tid_t child_tid);
+struct thread_file_container* find_file_container(struct list* files, int fid);
 int next_fid(struct thread *t);
 void lock_thread(struct thread* t);
 void unlock_thread(struct thread* t);

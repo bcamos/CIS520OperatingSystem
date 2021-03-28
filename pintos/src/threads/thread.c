@@ -184,17 +184,21 @@ thread_create (const char *name, int priority,
 
   /* Initialize thread. */
   init_thread (t, name, priority);
-  tid = t->tid = allocate_tid ();
+  tid = t->tid = allocate_tid ();  
+
+  //add self to parent list
+  t->self = (struct process_container*)malloc(sizeof(struct process_container));
+  if (t->self == NULL)
+  {
+      palloc_free_page(t);
+      return TID_ERROR;
+  }      
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
   old_level = intr_disable ();
-
-  //add self to parent list
-  t->self = (struct process_container*)malloc(sizeof(struct process_container));
-  if (t->self == NULL)
-      return TID_ERROR;
+  
   //t->self = palloc_get_page(0);
   t->self->is_alive = true;
   t->self->tid = t->tid;
@@ -477,16 +481,60 @@ running_thread (void)
 struct thread *
 find_thread(tid_t tid) {
 
-    struct list_elem *e;   
+    struct list_elem *item;   
     struct thread *the_thread;
 
-    for(e = list_begin((&all_list)); e != list_end((&all_list)); e=list_next(e)) 
+    for(item = list_begin(&all_list); item != list_end(&all_list); item = list_next(item)) 
     {
-        the_thread = list_entry(e, struct thread, allelem);
-        if(the_thread->tid == tid) {
+        the_thread = list_entry(item, struct thread, allelem);
+        if(the_thread->tid == tid) 
+        {
             return the_thread;
         }
     }
+    return NULL;
+}
+
+struct process_container* find_process_container(struct list* processes, tid_t child_tid)
+{
+    ASSERT(processes != NULL)
+
+    struct list_elem* item;
+    struct process_container* child;
+    if (list_empty(processes) == false)
+    {
+        
+        for(item = list_begin(processes); item != list_end(processes); item = list_next(item))
+        {
+            child = list_entry(item, struct process_container, elem);
+            if (child->tid == child_tid)
+            {
+                return child;
+            }            
+        }
+    }
+    return NULL;
+}
+
+struct thread_file_container* find_file_container(struct list* files, int fid)
+{
+    ASSERT(files != NULL)
+
+    struct list_elem* item;
+    struct thread_file_container* file;
+    if (list_empty(files) == false)
+    {
+
+        for (item = list_begin(files); item != list_end(files); item = list_next(item))
+        {
+            file = list_entry(item, struct thread_file_container, elem);
+            if (file->fid == fid)
+            {
+                return file;
+            }
+        }
+    }
+    return NULL;
 }
 
 int next_fid(struct thread* t)

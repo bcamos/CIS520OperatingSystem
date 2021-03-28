@@ -97,7 +97,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {    
     uint8_t* status = (uint8_t*) f->esp; // Get callers first argument from stack pointer
-    if ( is_valid_ptr(status) == false || check_valid_args(status) == false )
+    if ( is_valid_ptr(status) == false || is_valid_ptr(status + 4) == false || check_valid_args(status) == false )
     {
         exit(-1);
     }
@@ -186,13 +186,13 @@ exit(int status)
 {
     printf("%s: exit(%d)\n", thread_current()->name, status);
     // check if parent still alive
-    struct thread* parent = find_thread(thread_current()->parent_tid);
     lock_exit();
+    struct thread* parent = find_thread(thread_current()->parent_tid);    
     if (parent != NULL && parent->status != THREAD_DYING)
     {   
         thread_current()->self->exit_status = status;
     }
-    unlock_exit();
+    unlock_exit();    
     thread_exit();
 }
 
@@ -214,11 +214,14 @@ exec(const char* file)
     }    
     
     pid_t newProcess_tid = process_execute(file);
-
+    if (newProcess_tid == -1)
+    {
+        return -1;
+    }
     struct thread* t = thread_current();
-
-    struct process_container* child = NULL;
-    struct list_elem* item;
+    
+    struct process_container* child = find_process_container(&t->my_children_processes, newProcess_tid);
+    /*struct list_elem* item;
     bool found = false;
     if (list_empty(&t->my_children_processes) == false)
     {
@@ -230,7 +233,7 @@ exec(const char* file)
                 found = true;
             }
         }
-    }
+    }*/
     
     if (child == NULL)
     {        
@@ -368,9 +371,9 @@ open(const char* file)
         }
         file_container->file = opened_file;
         file_container->fid = next_fid(cur);
-        lock_thread(cur);
+        lock_files();
         list_push_back(&cur->my_files, &file_container->elem);
-        unlock_thread(cur);
+        unlock_files();
         return file_container->fid;
     }
     else
@@ -387,7 +390,17 @@ int
 filesize(int fd)
 {
     struct thread* t = thread_current();
+    int length = -1;
     lock_files();
+    struct thread_file_container* f = find_file_container(&t->my_files, fd);
+    if (f != NULL)
+    {
+        
+        length = file_length(f->file);
+        
+    }
+    unlock_files();
+    /*lock_files();
     if (list_empty(&t->my_files))
     {
         unlock_files();
@@ -403,8 +416,8 @@ filesize(int fd)
             return file_length(f->file);
         }
     }
-    unlock_files();
-    return -1;
+    unlock_files();*/
+    return length;
 }
 
 
@@ -440,9 +453,18 @@ read(int fd, void* buffer, unsigned size)
     }
     else
     {
-        for (temp = list_front(&thread_current()->my_files); temp != list_end(&thread_current()->my_files); temp = list_next(temp))
+        lock_files();
+        struct thread_file_container* f = find_file_container(&thread_current()->my_files, fd);
+        if (f != NULL)
         {
-            struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
+            
+            bytes = file_read(f->file, buffer, size);
+            
+        }
+        unlock_files();
+        /*for (temp = list_front(&thread_current()->my_files); temp != list_end(&thread_current()->my_files); temp = list_next(temp))
+        {
+            
 
             if (f->fid == fd)
             {
@@ -450,7 +472,7 @@ read(int fd, void* buffer, unsigned size)
                 bytes = file_read(f->file, buffer, size);
                 unlock_files();
             }
-        }
+        }*/
     }    
 
     
@@ -505,8 +527,9 @@ write(int fd, const void* buffer, unsigned size)
     }
     else if(fd > STDOUT_FILENO && list_empty(&cur->my_files) == false)
     {       
-        struct thread_file_container *file_container;
-        struct list_elem *file_elem = list_front(&cur->my_files);
+        lock_files();
+        struct thread_file_container *file_container = find_file_container(&cur->my_files, fd);
+        /*struct list_elem *file_elem = list_front(&cur->my_files);
         bool found = false;
         while (found == false && file_elem != list_end(&cur->my_files))
         {
@@ -516,14 +539,15 @@ write(int fd, const void* buffer, unsigned size)
                 found = true;
             }
             file_elem = list_next(file_elem);
-        }
-        if (found == true)
+        }*/
+        if (file_container != NULL)
         {
             ASSERT(file_container->fid == fd); // Sanity check;
-            lock_files();
+            
             bytes_written = file_write(file_container->file, buffer, size);
-            unlock_files();
+            
         }
+        unlock_files();
     }
    
     return bytes_written;
@@ -541,8 +565,16 @@ void
 seek(int fd, unsigned position)
 {
     struct list_elem* temp;
-
     lock_files();
+    struct thread_file_container* f = find_file_container(&thread_current()->my_files, fd);
+    if (f != NULL)
+    {
+        
+        file_seek(f->file, position);
+       
+    }
+    unlock_files();
+    /*lock_files();
 
     if (list_empty(&thread_current()->my_files) == false)
     {
@@ -557,7 +589,7 @@ seek(int fd, unsigned position)
         }
     }
 
-    unlock_files();    
+    unlock_files();    */
 }
 
 /*
@@ -568,8 +600,10 @@ tell(int fd)
 {
     struct thread* t = thread_current();
     struct list_elem *item;
-    struct thread_file_container* file;
-    bool found = false;
+    lock_files();
+    struct thread_file_container* file = find_file_container(&t->my_files, fd);
+    unsigned pos = 0;
+    /*bool found = false;
     unsigned pos = 0;
     if (list_empty(&t->my_files))
     {
@@ -582,15 +616,16 @@ tell(int fd)
         {
             bool found = true;
         }
-    }
+    }*/
 
-    if (found == true)
+    if (file != NULL)
     {
         ASSERT(file->fid == fd) // sanity check
-        lock_files();
+        
         pos = file_tell(file->file);
-        unlock_files();
+        
     }
+    unlock_files();
     return pos;    
 }
 
@@ -602,11 +637,11 @@ void
 close(int fd)
 {
     struct thread* cur = thread_current();
-    if (fd > STDOUT_FILENO && list_empty(&cur->my_files) == false)
+    if (fd > STDOUT_FILENO)
     {
-        
-        struct thread_file_container* file_container;
-        struct list_elem* file_elem = list_front(&cur->my_files);
+        lock_files();
+        struct thread_file_container* file_container = find_file_container(&cur->my_files, fd);
+        /*struct list_elem* file_elem = list_front(&cur->my_files);
         bool found = false;
         while (found == false && file_elem != list_end(&cur->my_files))
         {
@@ -619,17 +654,17 @@ close(int fd)
             {
                 file_elem = list_next(file_elem);
             }            
-        }
-        if (found == true)
+        }*/
+        if (file_container != NULL)
         {
             ASSERT(file_container->fid == fd); // Sanity check;
-            lock_files();
-            file_close(file_container->file);
-            unlock_files();
-            lock_thread(cur);
-            list_remove(file_elem);
-            unlock_thread(cur);
+            
+            file_close(file_container->file);          
+            
+            list_remove(&file_container->elem);
+            
             free(file_container);
         }
+        unlock_files();
     }
 }
