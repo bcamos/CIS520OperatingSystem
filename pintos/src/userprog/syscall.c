@@ -8,18 +8,23 @@
 #define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
 #define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
 #define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
-#define MAX_FILENAME_LENGTH 400
+#define MAX_FILENAME_LENGTH 14
+#define WHOLE_STRING -1
 
 static void syscall_handler (struct intr_frame *);
 static bool check_valid_args(uint8_t* status);
 static bool is_valid_ptr(uint8_t* ptr);
 static bool is_string_in_bounds(char* str, int maxlength);
 
+struct lock exit_lock;
+#define lock_exit() (lock_acquire(&exit_lock))
+#define unlock_exit() (lock_release(&exit_lock))
 
 void
 syscall_init (void) 
 {
     lock_init(&file_lock);
+    lock_init(&exit_lock);
     intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -75,7 +80,7 @@ is_string_in_bounds(char* str, int maxlength)
     
     for (i = 0; str[i] != '\0'; i++)
     {
-        if (i >= maxlength)
+        if (maxlength != WHOLE_STRING && i > maxlength)
         {
             return false;
         }
@@ -110,53 +115,52 @@ syscall_handler (struct intr_frame *f UNUSED)
             exit ( arg0(int, status) );
             break;
 
-        case SYS_EXEC:
+        case SYS_EXEC:            
             f->eax = -1;
             f->eax = exec ( arg0(char*, status) );            
             break;
 
-        case SYS_WAIT:
+        case SYS_WAIT:            
             f->eax = wait ( arg0(pid_t, status) );
             break;
 
-        case SYS_CREATE:
+        case SYS_CREATE:            
             f->eax = create ( arg0(char*, status), arg1(unsigned int, status) );
             break;
 
-        case SYS_REMOVE:
+        case SYS_REMOVE:            
             f->eax = remove ( arg0(char*, status) );
             break;
 
-        case SYS_OPEN:
+        case SYS_OPEN:            
             f->eax = open ( arg0(char*, status) );
             break;
 
-        case SYS_FILESIZE:
+        case SYS_FILESIZE:            
             f->eax = filesize ( arg0(int, status) );
             break;
 
-        case SYS_READ:
+        case SYS_READ:            
             f->eax = read ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
-        case SYS_WRITE:            
-            
+        case SYS_WRITE:
             f->eax = write ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
-        case SYS_SEEK:
+        case SYS_SEEK:            
             seek ( arg0(int, status), arg1(unsigned int, status) );
             break;
 
-        case SYS_TELL:
+        case SYS_TELL:            
             f->eax = tell ( arg0(int, status) );
             break;
 
-        case SYS_CLOSE:
+        case SYS_CLOSE:            
             close ( arg0(int, status) );
             break;
 
-        default:
+        default:            
             exit(-1);
             break;
     }
@@ -183,10 +187,12 @@ exit(int status)
     printf("%s: exit(%d)\n", thread_current()->name, status);
     // check if parent still alive
     struct thread* parent = find_thread(thread_current()->parent_tid);
+    lock_exit();
     if (parent != NULL && parent->status != THREAD_DYING)
     {   
-        thread_current()->self->exit_status = status;           
+        thread_current()->self->exit_status = status;
     }
+    unlock_exit();
     thread_exit();
 }
 
@@ -202,7 +208,7 @@ pid_t
 exec(const char* file)
 {
     
-    if (is_valid_ptr(file) == false || is_string_in_bounds(file, MAX_FILENAME_LENGTH) == false)
+    if (is_valid_ptr(file) == false || is_string_in_bounds(file, WHOLE_STRING) == false)
     {        
         exit(-1);
     }    
@@ -291,9 +297,14 @@ wait(pid_t pid)
 bool
 create(const char* file, unsigned initial_size)
 {
-    if (is_valid_ptr(file) == false)
+    if (is_valid_ptr(file) == false || is_string_in_bounds(file, WHOLE_STRING) == false)
     {
         exit(-1);
+        return false;
+    }
+    if (strlen(file) > MAX_FILENAME_LENGTH)
+    {
+        return false;
     }
     lock_files();
     bool file_creation = filesys_create(file, initial_size);
@@ -311,7 +322,7 @@ bool
 remove(const char* file)
 {
     bool success = false;
-    if (is_valid_ptr(file) == false)
+    if (is_valid_ptr(file) == false || is_string_in_bounds(file, MAX_FILENAME_LENGTH) == false)
     {
         exit(-1);
     }    
@@ -338,7 +349,7 @@ remove(const char* file)
 int
 open(const char* file)
 {
-    if (is_valid_ptr(file) == false)
+    if (is_valid_ptr(file) == false || is_string_in_bounds(file, MAX_FILENAME_LENGTH) == false)
     {
         exit(-1);
     }
@@ -406,7 +417,7 @@ filesize(int fd)
 int
 read(int fd, void* buffer, unsigned size)
 {
-    if (is_valid_ptr(buffer) == false )
+    if (is_valid_ptr(buffer) == false || is_valid_ptr(buffer + size + 1) == false)
     {
         exit(-1);
     }
@@ -464,7 +475,7 @@ read(int fd, void* buffer, unsigned size)
 int
 write(int fd, const void* buffer, unsigned size)
 {
-    if (is_valid_ptr(buffer) == false)
+    if (is_valid_ptr(buffer) == false || is_valid_ptr(buffer + size + 1) == false)
     {
         exit(-1);
     }
