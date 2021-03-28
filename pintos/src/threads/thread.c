@@ -193,11 +193,15 @@ thread_create (const char *name, int priority,
 
   //add self to parent list
   t->self = (struct process_container*)malloc(sizeof(struct process_container));
+  if (t->self == NULL)
+      return TID_ERROR;
   //t->self = palloc_get_page(0);
   t->self->is_alive = true;
   t->self->tid = t->tid;
   t->self->exit_status = -1;
+  t->self->loaded_successful = false;
   sema_init(&t->self->waiting_threads, 0);
+  sema_init(&t->self->load_sema, 0);
   list_push_back( &thread_current()->my_children_processes, &t->self->elem );
   
   t->parent_tid = thread_current()->tid;

@@ -37,7 +37,7 @@ process_execute (const char *file_name)
   fn_copy = palloc_get_page (0);
   //Extra copy to extract arguments
   fn_copyForArgs = palloc_get_page (0);
-  if (fn_copy == NULL)
+  if (fn_copy == NULL || fn_copyForArgs == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
   strlcpy (fn_copyForArgs, file_name, PGSIZE);
@@ -71,14 +71,17 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  thread_current()->self->loaded_successful = success;
+
+  sema_up(&thread_current()->self->load_sema);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
-  else {
-
-  }
+  if (!success)
+  {
+      exit(-1);
+  }   
+  
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -140,7 +143,10 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
-  
+  if (file_lock.holder == cur)
+  {
+      unlock_files();
+  }
   if (cur->my_code != NULL)
   {
       lock_files();
@@ -149,6 +155,34 @@ process_exit (void)
       unlock_files();
   }  
   
+  // Free children processes
+  struct list_elem* item;
+  struct process_container* child;
+  if (list_empty(&cur->my_children_processes) == false)
+  {
+      item = list_begin(&cur->my_children_processes);
+      while (item != list_end(&cur->my_children_processes))
+      {
+          child = list_entry(item, struct process_container, elem);
+          item = list_next(item);
+          list_remove(child);
+          free(child);
+      }
+  }
+
+  // Close all files  
+  struct thread_file_container* file;
+  if (list_empty(&cur->my_files) == false)
+  {
+      item = list_begin(&cur->my_files);
+      while (item != list_end(&cur->my_files))
+      {
+          file = list_entry(item, struct thread_file_container, elem);
+          item = list_next(item);
+          close(file->fid);
+      }
+  }
+
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
@@ -272,7 +306,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     int i = 0;
     fn_copyForArgs = palloc_get_page (0);
     strlcpy (fn_copyForArgs, file_name, PGSIZE);
-    argv = (char **) palloc_get_page (0);    
+    argv = (char **) palloc_get_page (0);
     
     for ( tok = strtok_r(fn_copyForArgs, " ", &pos); tok != NULL; tok = strtok_r(NULL," ", &pos) )
     {

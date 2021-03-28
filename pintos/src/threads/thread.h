@@ -31,9 +31,12 @@ struct process_container
 {
     tid_t tid;
     int exit_status;
-    bool is_alive;   
+    bool is_alive;
     struct semaphore waiting_threads;
     struct list_elem elem;
+
+    bool loaded_successful;
+    struct semaphore load_sema;
 };
 
 /* A kernel thread or user process.

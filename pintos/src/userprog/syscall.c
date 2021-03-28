@@ -8,12 +8,12 @@
 #define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
 #define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
 #define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
-#define MAX_FILENAME_LENGTH 100
+#define MAX_FILENAME_LENGTH 400
 
 static void syscall_handler (struct intr_frame *);
 static bool check_valid_args(uint8_t* status);
 static bool is_valid_ptr(uint8_t* ptr);
-static bool is_string_in_bounds(const char* str, int maxlength);
+static bool is_string_in_bounds(char* str, int maxlength);
 
 
 void
@@ -25,7 +25,7 @@ syscall_init (void)
 
 static bool
 check_valid_args(uint8_t *status)
-{   
+{       
     switch (*status)
     {
         // 1 arg
@@ -36,20 +36,20 @@ check_valid_args(uint8_t *status)
         case SYS_OPEN:
         case SYS_FILESIZE:
         case SYS_TELL:
-        case SYS_CLOSE:
-            return is_valid_ptr(status + sizeof(int));
+        case SYS_CLOSE:            
+            return is_valid_ptr(status + sizeof(int) * 2); // mult by 2 and not 1 in case entire pointer isn't in-bounds
             break;
 
         // 2 arg
         case SYS_CREATE:
         case SYS_SEEK:
-            return is_valid_ptr(status + (sizeof(int) * 2));
+            return is_valid_ptr(status + (sizeof(int) * 3));
             break;
 
         // 3 arg
         case SYS_READ:
         case SYS_WRITE:
-            return is_valid_ptr(status + (sizeof(int) * 3));
+            return is_valid_ptr(status + (sizeof(int) * 4));
             break;
 
         default:
@@ -60,43 +60,32 @@ check_valid_args(uint8_t *status)
 
 static bool
 is_valid_ptr(uint8_t *ptr)
-{
+{    
     if ( ptr >= PHYS_BASE || pagedir_get_page( thread_current()->pagedir, ptr) == NULL)
-    {
+    {        
         return false;
-    }
+    }    
     return true;
 }
 
 static bool
-is_string_in_bounds(const char* str, int maxlength)
-{
-    int i = 0;    
-    if (maxlength != 0)
+is_string_in_bounds(char* str, int maxlength)
+{    
+    int i = 0;
+    
+    for (i = 0; str[i] != '\0'; i++)
     {
-        while (str[i] != '\0')
+        if (i >= maxlength)
         {
-            // string too long
-            if (i >= maxlength)
-            {
-                return false;
-            }
-            i++;
-        }        
-    }
-    else
-    {
-        while (str[i] != '\0')
+            return false;
+        }
+        //look ahead 1
+        if (is_valid_ptr(str + i + 1) == false)
         {
-            // string too long
-            if (is_valid_ptr(str + i) == false)
-            {
-                return false;
-            }
-            i++;
-        }        
+            return false;
+        }
     }
-    return is_valid_ptr(str + i);
+    return true;    
 }
 
 static void
@@ -106,7 +95,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     if ( is_valid_ptr(status) == false || check_valid_args(status) == false )
     {
         exit(-1);
-    }    
+    }
+    
 
     // TODO Handle cases
     switch (*status)
@@ -116,11 +106,13 @@ syscall_handler (struct intr_frame *f UNUSED)
             break;
 
         case SYS_EXIT:
+            
             exit ( arg0(int, status) );
             break;
 
         case SYS_EXEC:
-            f->eax = exec ( arg0(char*, status) );
+            f->eax = -1;
+            f->eax = exec ( arg0(char*, status) );            
             break;
 
         case SYS_WAIT:
@@ -135,7 +127,7 @@ syscall_handler (struct intr_frame *f UNUSED)
             f->eax = remove ( arg0(char*, status) );
             break;
 
-        case SYS_OPEN:            
+        case SYS_OPEN:
             f->eax = open ( arg0(char*, status) );
             break;
 
@@ -143,11 +135,12 @@ syscall_handler (struct intr_frame *f UNUSED)
             f->eax = filesize ( arg0(int, status) );
             break;
 
-        case SYS_READ:            
+        case SYS_READ:
             f->eax = read ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
         case SYS_WRITE:            
+            
             f->eax = write ( arg0(int, status), arg1(void*, status), arg2(unsigned int, status) );
             break;
 
@@ -208,14 +201,48 @@ exit(int status)
 pid_t
 exec(const char* file)
 {
-    if (is_valid_ptr(file) == false )
-    {
+    
+    if (is_valid_ptr(file) == false || is_string_in_bounds(file, MAX_FILENAME_LENGTH) == false)
+    {        
         exit(-1);
-    }
+    }    
     
     pid_t newProcess_tid = process_execute(file);
+
+    struct thread* t = thread_current();
+
+    struct process_container* child = NULL;
+    struct list_elem* item;
+    bool found = false;
+    if (list_empty(&t->my_children_processes) == false)
+    {
+        for (item = list_begin(&t->my_children_processes); item != list_end(&t->my_children_processes) && found == false; item = list_next(item))
+        {
+            child = list_entry(item, struct process_container, elem);
+            if (child->tid == newProcess_tid)
+            {
+                found = true;
+            }
+        }
+    }
     
-    return newProcess_tid;
+    if (child == NULL)
+    {        
+        return -1;
+    }
+    
+    sema_down(&child->load_sema);
+
+    if (child->loaded_successful == true)
+    {      
+        return newProcess_tid;
+    }
+    else
+    {        
+        list_remove(&child->elem);
+        free(child);
+        return -1;
+    }
 }
 
 /*
@@ -291,7 +318,7 @@ remove(const char* file)
     lock_files();
     success = filesys_remove(file);
     unlock_files();
-    return success;
+    return success;    
 }
 
 
@@ -324,7 +351,10 @@ open(const char* file)
     {
         struct thread* cur = thread_current();
         struct thread_file_container* file_container = (struct thread_file_container*)malloc(sizeof(struct thread_file_container));
-        //struct thread_file_container* file_container = palloc_get_page(0);
+        if (file_container == NULL)
+        {
+            return -1;
+        }
         file_container->file = opened_file;
         file_container->fid = next_fid(cur);
         lock_thread(cur);
@@ -380,36 +410,40 @@ read(int fd, void* buffer, unsigned size)
     {
         exit(-1);
     }
+  
     struct list_elem* temp;
-    int bytes = -1;   
-    if (size == 0)
-    {        
+    int bytes = -1;    
+    if (size <= 0)
+    {
         return size;
     }
     if (fd == STDIN_FILENO)
-    {                
+    {        
         lock_files();
         bytes = input_getc();        
         unlock_files();
     }
     else if (fd == STDOUT_FILENO || list_empty(&thread_current()->my_files))
-    {        
+    {
         bytes = 0;
     }
     else
-    {        
+    {
         for (temp = list_front(&thread_current()->my_files); temp != list_end(&thread_current()->my_files); temp = list_next(temp))
         {
-            struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);            
+            struct thread_file_container* f = list_entry(temp, struct thread_file_container, elem);
+
             if (f->fid == fd)
-            {                
+            {
                 lock_files();
                 bytes = file_read(f->file, buffer, size);
-                unlock_files();                
+                unlock_files();
             }
         }
-    }   
+    }    
 
+    
+   
     return bytes;
 }
 
@@ -480,6 +514,7 @@ write(int fd, const void* buffer, unsigned size)
             unlock_files();
         }
     }
+   
     return bytes_written;
 }
 
