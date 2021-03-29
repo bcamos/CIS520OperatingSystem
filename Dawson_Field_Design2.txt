@@ -42,9 +42,11 @@ i) Modified process_execute - Now thread will be created with only the filename,
   at the command line. That information is retained in fn_copy, and then parsed in the load function.
   Then they are passed to the setup_stack function to be pushed onto the stack. 
 
-ii) In load function - Count arguments and save in argc. Save arguments in argv[]. argv[0] will contain filename. strtok_r is used to parse the name+arguments and the parsed arguments are saved in argv.
+ii) In load function - Count arguments and save in argc. Save arguments in argv[]. 
+argv[0] will contain filename. strtok_r is used to parse the name+arguments and the parsed arguments are saved in argv.
 
-iii) argv and argc are passed to setup_stack. Each time the stack pointer is decremented and arguments are pushed. Arguments are pushed in the right order one by one. This is the order used:
+iii) argv and argc are passed to setup_stack. Each time the stack pointer is decremented and arguments are pushed. 
+Arguments are pushed in the right order one by one. This is the order used:
 
 a) arguments - from argv[n] to argv[0]
 b) word-align to 4 bytes
@@ -57,7 +59,8 @@ f) fake return address
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
 
-strtok_r() is reentrant - it allows the same string to be manipulated from 2 or more different places at the same time. It manages to do this by using an argument to save state instead of using a global variable like strtok().
+strtok_r() is reentrant - it allows the same string to be manipulated from 2 or more different places at the same time. 
+It manages to do this by using an argument to save state instead of using a global variable like strtok().
 
 >> A4: In Pintos, the kernel separates commands into an executable name
 >> and arguments.  In Unix-like systems, the shell does this
