@@ -78,9 +78,40 @@ ii) the shell will setup the stack instead of having the kernel do it
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+#define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
+#define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
+#define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
+	- these are instanciated structs for the current arguments being handled.
+	
+#define MAX_FILENAME_LENGTH 14
+#define WHOLE_STRING -1
+	- global vars for filenames
+
+static void syscall_handler (struct intr_frame *);
+	- static variable for the syscall_handler
+	
+static bool check_valid_args(uint8_t* status);
+	- static variable for argument validation
+	
+static bool is_valid_ptr(uint8_t* ptr);
+	- static boolean variable to indicate valid status
+	
+static bool is_string_in_bounds(char* str, int maxlength);
+	- static boolean variable to validate filename
+
+struct lock exit_lock;
+	- lock state variable
+	
+#define lock_exit() (lock_acquire(&exit_lock))
+#define unlock_exit() (lock_release(&exit_lock))
+	- definitions for lock state entrance and exit functions
+
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
+
+i) File descriptors are coded to open the files using the file description which uses a pointer and descriptor.
+File descriptors are unique within a process.
 
 ---- ALGORITHMS ----
 
