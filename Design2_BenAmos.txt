@@ -1,0 +1,262 @@
+		           +--------------------------+
+				   |         CIS 520          |
+		           | PROJECT 2: USER PROGRAMS |
+		           |     DESIGN DOCUMENT      |
+		           +--------------------------+
+
+---- GROUP ----
+
+>> Fill in the names of your group members.
+
+Ben Amos
+Nathan Brown
+Dawson Field
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+https://static1.squarespace.com/static/5b18aa0955b02c1de94e4412/t/5b85fad2f950b7b16b7a2ed6/1535507195196/Pintos+Guide
+https://www.youtube.com/watch?v=OE79vNZp1KI
+https://github.com/Waqee/Pintos-Project-2
+https://github.com/st2092/pintos-user-programs
+https://github.com/MohamedSamirShabaan/Pintos-Project-2
+https://github.com/kinux98/pintos-project-2
+
+			   ARGUMENT PASSING
+			   ================
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+None
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe how you implemented argument parsing.  How do
+>> you arrange for the elements of argv[] to be in the right order?
+>> How do you avoid overflowing the stack page?
+
+Before calling thread create, we parse out the executable file name, and then pass the unparsed string as auxillary parameter to thread_create.
+In the load function, we count the number of tokens (args), and store that in an integer argc, and we also store the args themselves in argv -- both variables
+we allocate in the load function. We then pass argc, argv and the stack pointer to setup the stack. We initialize the stack pointer to PHYS_BASE, and the iterate through each
+argv, and copy it to the stack we are setting up, we keep track of position of the stack pointer by decrementing by the length of the string + 1, we do + 1 since a string needs the '\0' character
+to denote end of string. We then position the stack pointer to the even number, multiple of 4, and then subtract another 4 for the next arg, which is the pointers to the strings of argv, we then copy these over. 
+Then copy the pointer that starts the array of pointers (argv), and then finally copy argc, and lastly a return address of 0.
+
+
+---- RATIONALE ----
+
+>> A3: Why does Pintos implement strtok_r() but not strtok()?
+
+Not sure i know the difference, i just use the function that exists if it has the functionality that i need, or write my own lol
+
+>> A4: In Pintos, the kernel separates commands into an executable name
+>> and arguments.  In Unix-like systems, the shell does this
+>> separation.  Identify at least two advantages of the Unix approach.
+
+Less variable name confusion, i strongly dislike that pintos default names are "file_name" when it is more accurately file_name + args, or perhaps cmd_line.
+Since the shell is primarily concerned with interacting with the user, could give faster feedback to the user if they formated something wrong.
+
+			     SYSTEM CALLS
+			     ============
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+In thread.h
+
+struct process_container -- Keeps track of children processes for a given thread
+{
+    tid_t tid; // the process id
+    int exit_status; // the processes exit status if applicable
+    bool is_alive; // whether the thread is still alive or not
+    struct semaphore waiting_threads; // semaphore for parent to grab if waiting for process to finish
+    struct list_elem elem; // to store in a list
+
+    bool loaded_successful; // whether the process has successfully loaded and initialized itself ok
+    struct semaphore load_sema; // semaphore for synchonrization of parent thread 
+
+
+}; 
+
+struct thread_file_container -- Maps a file id to a file that a thread has opened
+{
+    struct file* file; -- the opened file
+    int fid; -- the file id (or descriptor)
+    struct list_elem elem; -- to store in a list
+};
+
+
+in thread struct added:
+
+    struct list my_files; -- a list of thread_file_containers that the thread has opened 
+    int next_fid;  -- the next file id to assign to a new file
+    struct list my_children_processes; -- a list of process_containers of all children processes
+    int parent_tid; -- the parent thread which created me
+    struct lock my_lock; -- a lock to grab if wanting to change a data structure associated with me
+
+    struct process_container* self; -- a reference to the process container which describes me, parent owns and handles memory though
+    struct file* my_code; -- the opened file which contains my code
+    bool is_kernal; -- whether the thread is the kernal or not (set in init.c), don't want to talk to my parent thread if i don't know who my parents are
+
+In syscall.h added:
+ 
+struct lock file_lock; -- only one thread at a time gets to write to files and what not
+
+#define lock_files() (lock_acquire(&file_lock)) -- totally unnecessary, but totally cool, saw a solution online that interacted with locks this way, and thought this was an intuitive design worth modeling in mine
+#define unlock_files() (lock_release(&file_lock))
+
+In syscall.c added:
+
+#define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )  -- dereferences and casts the first arg given the stack pointer (i assume pointer error checking before calling this)
+#define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) ) // 2nd arg
+#define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) ) // 3rd arg
+#define MAX_FILENAME_LENGTH 14  --  maximum length a filename should be
+#define WHOLE_STRING -1 -- whether to check the whole string (in is_string_in_bounds)
+
+struct lock exit_lock;
+#define lock_exit() (lock_acquire(&exit_lock))
+#define unlock_exit() (lock_release(&exit_lock))
+
+>> B2: Describe how file descriptors are associated with open files.
+>> Are file descriptors unique within the entire OS or just within a
+>> single process?
+
+I store file descriptors as something that only make sense to a particular thread, they aren't unique, and multiple threads could have a file descriptor of 2 or 3 etc. and they map to
+different files. I store a variable next_fid, which stores the value of the next available fid for a particular thread, and gets incrememented on each file creation. When i open a file, i create
+a thread_file_container, with the next fid, and a pointer to the opened file.
+
+---- ALGORITHMS ----
+
+>> B3: Describe your code for reading and writing user data from the
+>> kernel.
+
+In the system call, i check to see if the stack pointer is greater than or equal to PHYS_BASE, which would indicate kernal memory. I struggled to find the lower threshold in the code, if the pointer was below a programs text portion.
+I noticed on several solutions online that most people were using the pageedir_get_page function, which seems to already have that error checking implemented in it, so i also use that function to check the lower threshold.
+Before dereferencing any pointers i also check to make sure that the args are also still within bounds, and that being true for the entire 4 byte area associated with it. For checking strings, i was unable to use strlen, as this doesn't have any
+error checking in it, so i go character by character, looking ahead 1 byte to see if it's inbounds if it's not the end of the string. For buffers, I just check the end pointers assoicated with it (buffer) -> (buffer + size + 1) and for sanity, i tacked on a +1
+because it is my assumption that there is likely a '\0' that gets written at the end of the buffur, but this may have been unnecessary. 
+
+>> B4: Suppose a system call causes a full page (4,096 bytes) of data
+>> to be copied from user space into the kernel.  What is the least
+>> and the greatest possible number of inspections of the page table
+>> (e.g. calls to pagedir_get_page()) that might result?  What about
+>> for a system call that only copies 2 bytes of data?  Is there room
+>> for improvement in these numbers, and how much?
+
+My assumption is that checking endpoints is sufficient (2) -- since we are given a size, we don't necessarily need to iterate through the buffer -- if we didn't know size prior, this could be a problem.
+
+>> B5: Briefly describe your implementation of the "wait" system call
+>> and how it interacts with process termination.
+
+Lol, this one through me for a loop, quite literally. I decided that the parent needed to be the one managing memory, since if the parent dies, then the child's exit status and synchronization shouldn't matter anymore, the child just needs a way
+to figure out it's parent is dead so that it doesn't dereference memory that is garbage or is already something else. 
+I created a struct called process_container to share memory between the parent and child, and the parent is the one who manages it. If the parent wants to wait for a child, it first checks to see if the child is theirs, and if it has a copy of the 
+process_container that the child has, if it does, then it grabs the semaphore and waits. When the child process is finished, it also has access to this process_container; if the parent still exists, it issues a sema_up upon exiting. The way the child knows the parent
+is dead or not is by keeping track of the parents thread id in it's own memory; when it wants to check, it searches the list of threads, and if it comes back with a thread, and one that isn't dying, then it knows the parent is still alive, and so it can update it's
+exit status and let the parent move on to the next task. Within the wait command, the parent then continues after the semaphore, and since the parent is in charge of memory it doesn't do any error checking and grabs the exit status from the container, and then frees up
+the memory.
+
+>> B6: Any access to user program memory at a user-specified address
+>> can fail due to a bad pointer value.  Such accesses must cause the
+>> process to be terminated.  System calls are fraught with such
+>> accesses, e.g. a "write" system call requires reading the system
+>> call number from the user stack, then each of the call's three
+>> arguments, then an arbitrary amount of user memory, and any of
+>> these can fail at any point.  This poses a design and
+>> error-handling problem: how do you best avoid obscuring the primary
+>> function of code in a morass of error-handling?  Furthermore, when
+>> an error is detected, how do you ensure that all temporarily
+>> allocated resources (locks, buffers, etc.) are freed?  In a few
+>> paragraphs, describe the strategy or strategies you adopted for
+>> managing these issues.  Give an example.
+
+A difficult question indeed, the only lock of primary concern was the filesystem lock, which i added code on thread_exit to check if it's the locker holder or not and then release.
+A better apporach for more scalability if i have more time, would be to store a list of locks that the thread has, and make sure that the thread issues a lock_release for all of them before exiting. We just had one, so i didn't think it was as necessary.
+
+---- SYNCHRONIZATION ----
+
+>> B7: The "exec" system call returns -1 if loading the new executable
+>> fails, so it cannot return before the new executable has completed
+>> loading.  How does your code ensure this?  How is the load
+>> success/failure status passed back to the thread that calls "exec"?
+
+Same way as handling the exit status, i encapsulate this in the process_container; I store a bool whether the process was loaded correctly or not, and a semaphore for the parent process.
+The parent tries to grab the semaphore of the child (if it exists), and the child releases it when the load is found successful or not, and this is stored in the bool. Since the parent
+handles memory for the process_container, if the child doesn't exist, then we know something went wrong and no need for message passing: something went wrong.
+
+>> B8: Consider parent process P with child process C.  How do you
+>> ensure proper synchronization and avoid race conditions when P
+>> calls wait(C) before C exits?  After C exits?  How do you ensure
+>> that all resources are freed in each case?  How about when P
+>> terminates without waiting, before C exits?  After C exits?  Are
+>> there any special cases?
+
+Same way as handling the exit status. I declare a separate semaphore for the parent thread to try to grab, (initialized to zero so that the parent is forced to wait), when the child exits, it
+releases the semaphore. If the child exits after the parent issues the wait command, well, no need for synchronization, the parent is able to grab the semaphore and run, and the exit status has
+already been recorded within the process_container, which the parent is in charge of to dispose of. Parent is in charge of resoures totally, by giving the child the thread id of the parent, they 
+are able to lookup at anytime whether their parent still exists in the list of threads to determine whether it is legal to message pass to the process container.
+
+---- RATIONALE ----
+
+>> B9: Why did you choose to implement access to user memory from the
+>> kernel in the way that you did?
+
+I was trying to avoid multiplying new data structs; originally, i wanted to just do everything in the thread in terms of keep track of exit status and what not, which may have worked, 
+but I was running into issues in terms of when the a parent has many children, who gets to set the exit status or semaphore; i didn't see any good way to manage memory when threads exit and maintain synchronization without declaring
+a separate data struct to message pass the exit status and a semaphore.
+
+>> B10: What advantages or disadvantages can you see to your design
+>> for file descriptors?
+
+In thinking through the file system, it made sense for threads to keep a list of the files that they opened from an intuitive standpoint;
+having done this once now, i think an even better design would be to keep a separate list in the syscall.c file to map thread id's to a list of thread_file_containers, which map to opened files. It would have been an extra step,
+but i think that would have removed some of the headache of closing and opening files, and keep the file system as something maintaining more in the module of syscall.c rather than spread between files. 
+
+
+>> B11: The default tid_t to pid_t mapping is the identity mapping.
+>> If you changed it, what advantages are there to your approach?
+
+I like the identity, and i couldn't justify changing it with the scale that we were doing -- perhaps if we wanted files to be shared between threads, perhaps, we could
+map many threads to one process or vise-versa in order to share opened files or something.
+
+			   SURVEY QUESTIONS
+			   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+I think i learned the most from this project, and gained a fairly in-depth understanding of how system calls can work.
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+Most of the system calls involve calling the already implemented function calls in filesys.c -- i was fairly stuck on this point for about a week, not knowing
+how we were supposed to open a file (like in assembly or something) given a file descriptor.
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
