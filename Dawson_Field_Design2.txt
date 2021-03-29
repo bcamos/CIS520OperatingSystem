@@ -14,12 +14,13 @@ Nathan Brown
 
 ---- PRELIMINARIES ----
 
->> If you have any preliminary comments on your submission, notes for the
->> TAs, or extra credit, please give them here.
-
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
+
+https://static1.squarespace.com/static/5b18aa0955b02c1de94e4412/t/5b85fad2f950b7b16b7a2ed6/1535507195196/Pintos+Guide
+countless youtube videos
+https://github.com/Waqee/Pintos-Project-2
 
 			   ARGUMENT PASSING
 			   ================
@@ -78,45 +79,83 @@ ii) the shell will setup the stack instead of having the kernel do it
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-#define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )
-#define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) )
+In syscall.c:
+	
+#define arg0(STRUCT, ESP) ( *( (STRUCT *)(ESP + 4) ) )  
+	- dereferences arg0
+#define arg1(STRUCT, ESP) ( *( (STRUCT *)(ESP + 8) ) ) 
+	- same here for arg1
 #define arg2(STRUCT, ESP) ( *( (STRUCT *)(ESP + 12) ) )
-	- these are instanciated structs for the current arguments being handled.
-	
-#define MAX_FILENAME_LENGTH 14
+	- and arg 2
+#define MAX_FILENAME_LENGTH 14  
+	- limit to the length of a filename
 #define WHOLE_STRING -1
-	- global vars for filenames
+	- indicates if the entire string should be checked
+	
+In syscall.h:
 
-static void syscall_handler (struct intr_frame *);
-	- static variable for the syscall_handler
-	
-static bool check_valid_args(uint8_t* status);
-	- static variable for argument validation
-	
-static bool is_valid_ptr(uint8_t* ptr);
-	- static boolean variable to indicate valid status
-	
-static bool is_string_in_bounds(char* str, int maxlength);
-	- static boolean variable to validate filename
+struct lock file_lock;
+	- locks file so that only one file can be accessed at a time
+#define lock_files() (lock_acquire(&file_lock))
+	- something ben wrote idk what it actually does
+#define unlock_files() (lock_release(&file_lock))
 
-struct lock exit_lock;
-	- lock state variable
-	
-#define lock_exit() (lock_acquire(&exit_lock))
-#define unlock_exit() (lock_release(&exit_lock))
-	- definitions for lock state entrance and exit functions
+In thread.h:
 
+struct process_container // hold information about child process of a thread
+{
+    tid_t tid; // process id
+    int exit_status; // exit status
+    bool is_alive; // alive state
+    struct semaphore waiting_threads; // semafore for parent process waiting
+    struct list_elem elem; // list for storage
+
+    bool loaded_successful; // load sucessful state
+    struct semaphore load_sema; // semaphore for synchonrization
+
+
+}; 
+
+struct thread_file_container // attaches an id to a file that has been opened
+{
+    struct file* file; //opened file
+    int fid; // id
+    struct list_elem elem; // list for storage
+};
+
+Thread struct:
+
+struct list my_files;
+	- a list of opened files
+int next_fid;
+	- the next id number
+struct list my_children_processes;
+	- list of all child processes
+int parent_tid; 
+	- list of all parent threads
+struct lock my_lock;
+
+struct process_container* self;
+	- pointer to a process
+struct file* my_code;
+
+bool is_kernal;
+	- indicates if a thread is a kernel thread or not
+	
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
 
-i) File descriptors are coded to open the files using the file description which uses a pointer and descriptor.
+File descriptors are coded to open the files using the file description which uses a pointer and descriptor.
 File descriptors are unique within a process.
 
 ---- ALGORITHMS ----
 
 >> B3: Describe your code for reading and writing user data from the
 >> kernel.
+
+In syscall, it checks that the stack pointer is greater than or equal to the value of the PHYS_BASE static variable, this indicates that you are able to access kernel memory.
+
 
 >> B4: Suppose a system call causes a full page (4,096 bytes) of data
 >> to be copied from user space into the kernel.  What is the least
@@ -125,8 +164,13 @@ File descriptors are unique within a process.
 >> for a system call that only copies 2 bytes of data?  Is there room
 >> for improvement in these numbers, and how much?
 
+From what i can tell, checking endpoints is an effective and efficient method of doing so.
+If you dont know the size beforehand it probably wont work for all cases, but as long as you do know the size it will work fine.
+
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
+
+Used a struct, process_container  to share memory between a parent and child. the container directly signifies this relationship and is used to execute process wait, in which it checks on the status of each and determines how to proceed from there.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
@@ -149,6 +193,8 @@ File descriptors are unique within a process.
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
 
+In our code this is handled within the process_container, it has a semafore for the parent process and a bool to indicate if the process is loaded properly.
+
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
 >> calls wait(C) before C exits?  After C exits?  How do you ensure
@@ -156,13 +202,21 @@ File descriptors are unique within a process.
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
 
+Exactly the same method as the exit status handling.
+
 ---- RATIONALE ----
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
 
+Avoids creating new data structs.
+
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
 
+It would be a lot more simple and likely more efficient if the file system was more condensed rather than scattered amongst files.
+
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
+
+Its fine the way it works and it makes sense to me.
