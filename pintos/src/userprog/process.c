@@ -110,7 +110,9 @@ process_wait (tid_t child_tid /*UNUSED*/)
 {
     //struct list_elem* item;
     //struct list* processes = &(thread_current()->my_children_processes);
+    lock_thread(thread_current());
     struct process_container* child_thread = find_process_container(&thread_current()->my_children_processes, child_tid);
+    unlock_thread(thread_current());
     int status = -1;
     /*bool found = false;
     int status = -1;
@@ -136,7 +138,9 @@ process_wait (tid_t child_tid /*UNUSED*/)
     {
         sema_down(&(child_thread->waiting_threads));        
         status = child_thread->exit_status;
+        lock_thread(thread_current());
         list_remove(&child_thread->elem);
+        unlock_thread(thread_current());
         free(child_thread);
     }
     return status;
@@ -146,7 +150,7 @@ process_wait (tid_t child_tid /*UNUSED*/)
 void
 process_exit (void)
 {
-  struct thread *cur = thread_current ();
+  struct thread *cur = thread_current ();  
   if (lock_held_by_current_thread(&file_lock) == true)
   {
       unlock_files();
@@ -162,20 +166,23 @@ process_exit (void)
   // Free children processes
   struct list_elem* item;
   struct process_container* child;
+  lock_thread(cur);
   if (list_empty(&cur->my_children_processes) == false)
   {
       item = list_begin(&cur->my_children_processes);
       while (item != list_end(&cur->my_children_processes))
       {
           child = list_entry(item, struct process_container, elem);
-          item = list_next(item);
-          list_remove(child);
+          item = list_next(item);          
+          list_remove(&child->elem);          
           free(child);
       }
   }
+  unlock_thread(cur);
 
   // Close all files  
   struct thread_file_container* file;
+  lock_files();
   if (list_empty(&cur->my_files) == false)
   {
       item = list_begin(&cur->my_files);
@@ -183,9 +190,20 @@ process_exit (void)
       {
           file = list_entry(item, struct thread_file_container, elem);
           item = list_next(item);
-          close(file->fid);
+          file_close(file->file);
+          list_remove(&file->elem);
+          free(file);
       }
   }
+  unlock_files();
+
+  struct thread* parent = find_thread(cur->parent_tid);
+  enum intr_level status = intr_disable();
+  if (parent != NULL && parent->tid == cur->tid && parent->my_lock.holder == cur)
+  {
+      unlock_thread(parent);
+  }
+  intr_set_level(status);
 
   uint32_t *pd;
 
@@ -343,7 +361,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. */
   lock_files();
   file = filesys_open (argv[0]);
-  unlock_files();
+  //unlock_files();
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", argv[0]);
@@ -442,7 +460,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   {
       file_close(file);
   } 
-  //unlock_files();
+  unlock_files();
   palloc_free_page(argv);
   palloc_free_page(fn_copyForArgs);
   return success;

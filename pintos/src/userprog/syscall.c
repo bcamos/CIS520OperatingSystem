@@ -102,8 +102,6 @@ syscall_handler (struct intr_frame *f UNUSED)
         exit(-1);
     }
     
-
-    // TODO Handle cases
     switch (*status)
     {
         case SYS_HALT:
@@ -219,8 +217,9 @@ exec(const char* file)
         return -1;
     }
     struct thread* t = thread_current();
-    
+    lock_thread(t);
     struct process_container* child = find_process_container(&t->my_children_processes, newProcess_tid);
+    unlock_thread(t);
     /*struct list_elem* item;
     bool found = false;
     if (list_empty(&t->my_children_processes) == false)
@@ -247,9 +246,9 @@ exec(const char* file)
         return newProcess_tid;
     }
     else
-    {        
-        list_remove(&child->elem);
-        free(child);
+    {                
+        //list_remove(&child->elem);        
+        //free(child);
         return -1;
     }
 }
@@ -441,19 +440,18 @@ read(int fd, void* buffer, unsigned size)
     {
         return size;
     }
+    lock_files();
     if (fd == STDIN_FILENO)
-    {        
-        lock_files();
-        bytes = input_getc();        
-        unlock_files();
+    {                
+        bytes = input_getc();       
+        
     }
     else if (fd == STDOUT_FILENO || list_empty(&thread_current()->my_files))
     {
         bytes = 0;
     }
     else
-    {
-        lock_files();
+    {        
         struct thread_file_container* f = find_file_container(&thread_current()->my_files, fd);
         if (f != NULL)
         {
@@ -461,7 +459,7 @@ read(int fd, void* buffer, unsigned size)
             bytes = file_read(f->file, buffer, size);
             
         }
-        unlock_files();
+        
         /*for (temp = list_front(&thread_current()->my_files); temp != list_end(&thread_current()->my_files); temp = list_next(temp))
         {
             
@@ -474,7 +472,7 @@ read(int fd, void* buffer, unsigned size)
             }
         }*/
     }    
-
+    unlock_files();
     
    
     return bytes;
@@ -525,7 +523,7 @@ write(int fd, const void* buffer, unsigned size)
         bytes_written = size;        
         unlock_files();
     }
-    else if(fd > STDOUT_FILENO && list_empty(&cur->my_files) == false)
+    else if(fd > STDOUT_FILENO)
     {       
         lock_files();
         struct thread_file_container *file_container = find_file_container(&cur->my_files, fd);
@@ -660,9 +658,9 @@ close(int fd)
             ASSERT(file_container->fid == fd); // Sanity check;
             
             file_close(file_container->file);          
-            
+            lock_thread(cur);
             list_remove(&file_container->elem);
-            
+            unlock_thread(cur);
             free(file_container);
         }
         unlock_files();

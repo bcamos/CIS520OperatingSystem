@@ -193,6 +193,16 @@ thread_create (const char *name, int priority,
       palloc_free_page(t);
       return TID_ERROR;
   }      
+  
+  t->self->is_alive = true;
+  t->self->tid = t->tid;
+  t->self->exit_status = -1;
+  t->self->loaded_successful = false;
+  sema_init(&t->self->waiting_threads, 0);
+  sema_init(&t->self->load_sema, 0);
+  lock_thread(thread_current());
+  list_push_back(&thread_current()->my_children_processes, &t->self->elem);
+  unlock_thread(thread_current());
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
@@ -200,13 +210,7 @@ thread_create (const char *name, int priority,
   old_level = intr_disable ();
   
   //t->self = palloc_get_page(0);
-  t->self->is_alive = true;
-  t->self->tid = t->tid;
-  t->self->exit_status = -1;
-  t->self->loaded_successful = false;
-  sema_init(&t->self->waiting_threads, 0);
-  sema_init(&t->self->load_sema, 0);
-  list_push_back( &thread_current()->my_children_processes, &t->self->elem );
+  
   
   t->parent_tid = thread_current()->tid;
 
@@ -483,15 +487,17 @@ find_thread(tid_t tid) {
 
     struct list_elem *item;   
     struct thread *the_thread;
-
+    enum intr_level status = intr_disable();
     for(item = list_begin(&all_list); item != list_end(&all_list); item = list_next(item)) 
     {
         the_thread = list_entry(item, struct thread, allelem);
         if(the_thread->tid == tid) 
         {
+            intr_set_level(status);
             return the_thread;
         }
     }
+    intr_set_level(status);
     return NULL;
 }
 

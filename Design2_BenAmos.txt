@@ -17,6 +17,10 @@ Dawson Field
 >> If you have any preliminary comments on your submission, notes for the
 >> TAs, or extra credit, please give them here.
 
+We didn't quite get the last test, no-vm completed. We are soooooooo close, just ran out of time. It has to do with the way we are
+releasing locks or lists (backtrace) when something goes wrong with memory since our program is able to surive 45 page faults before the OS does something bad, it is likely
+related to an edge case related to memory -- one more day, we could finish. 
+
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
@@ -57,7 +61,7 @@ Then copy the pointer that starts the array of pointers (argv), and then finally
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
 
-Not sure i know the difference, i just use the function that exists if it has the functionality that i need, or write my own lol
+Not sure that i know the difference, i used the function that exists if it has the functionality that i need, or write my own.
 
 >> A4: In Pintos, the kernel separates commands into an executable name
 >> and arguments.  In Unix-like systems, the shell does this
@@ -161,7 +165,7 @@ My assumption is that checking endpoints is sufficient (2) -- since we are given
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
 
-Lol, this one through me for a loop, quite literally. I decided that the parent needed to be the one managing memory, since if the parent dies, then the child's exit status and synchronization shouldn't matter anymore, the child just needs a way
+This one through me for a loop, quite literally. I decided that the parent needed to be the one managing memory, since if the parent dies, then the child's exit status and synchronization shouldn't matter anymore, the child just needs a way
 to figure out it's parent is dead so that it doesn't dereference memory that is garbage or is already something else. 
 I created a struct called process_container to share memory between the parent and child, and the parent is the one who manages it. If the parent wants to wait for a child, it first checks to see if the child is theirs, and if it has a copy of the 
 process_container that the child has, if it does, then it grabs the semaphore and waits. When the child process is finished, it also has access to this process_container; if the parent still exists, it issues a sema_up upon exiting. The way the child knows the parent
@@ -184,7 +188,7 @@ the memory.
 >> managing these issues.  Give an example.
 
 A difficult question indeed, the only lock of primary concern was the filesystem lock, which i added code on thread_exit to check if it's the locker holder or not and then release.
-A better apporach for more scalability if i have more time, would be to store a list of locks that the thread has, and make sure that the thread issues a lock_release for all of them before exiting. We just had one, so i didn't think it was as necessary.
+A better apporach for more scalability if i have more time, would be to store a list of locks that the thread has, and make sure that the thread issues a lock_release for all of them before exiting. We just had two, so i didn't think it was as necessary.
 
 ---- SYNCHRONIZATION ----
 
@@ -244,10 +248,12 @@ the quarter.
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
+Having the last test no-vm being worth 10% + losing another 10% for a non-working solution is a signficant amount of pressure.
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
 
-I think i learned the most from this project, and gained a fairly in-depth understanding of how system calls can work.
+I think i learned the most from this project, it was by far the most work, but i learned a lot.
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
