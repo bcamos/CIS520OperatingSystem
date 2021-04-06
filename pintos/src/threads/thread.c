@@ -8,12 +8,12 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
-#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "userprog/syscall.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -97,7 +97,6 @@ thread_init (void)
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
-  //initial_thread->is_kernal = true;
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
 }
@@ -184,35 +183,12 @@ thread_create (const char *name, int priority,
 
   /* Initialize thread. */
   init_thread (t, name, priority);
-  tid = t->tid = allocate_tid ();  
-
-  //add self to parent list
-  t->self = (struct process_container*)malloc(sizeof(struct process_container));
-  if (t->self == NULL)
-  {
-      palloc_free_page(t);
-      return TID_ERROR;
-  }      
-  
-  t->self->is_alive = true;
-  t->self->tid = t->tid;
-  t->self->exit_status = -1;
-  t->self->loaded_successful = false;
-  sema_init(&t->self->waiting_threads, 0);
-  sema_init(&t->self->load_sema, 0);
-  lock_thread(thread_current());
-  list_push_back(&thread_current()->my_children_processes, &t->self->elem);
-  unlock_thread(thread_current());
+  tid = t->tid = allocate_tid ();
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
   old_level = intr_disable ();
-  
-  //t->self = palloc_get_page(0);
-  
-  
-  t->parent_tid = thread_current()->tid;
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -227,7 +203,7 @@ thread_create (const char *name, int priority,
   /* Stack frame for switch_threads(). */
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
-  sf->ebp = 0;  
+  sf->ebp = 0;
 
   intr_set_level (old_level);
 
@@ -318,23 +294,14 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
+  syscall_exit ();
+  
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  struct thread* cur = thread_current();
-  list_remove (&cur->allelem);
-  
-  if (cur->is_kernal == false)
-  {
-      struct thread* parent = find_thread(cur->parent_tid);
-      if (parent != NULL && parent->status != THREAD_DYING)
-      {
-          cur->self->is_alive = false;
-          sema_up(&cur->self->waiting_threads);
-      }
-  }  
-  cur->status = THREAD_DYING;
+  list_remove (&thread_current()->allelem);
+  thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
 }
@@ -482,86 +449,6 @@ running_thread (void)
   return pg_round_down (esp);
 }
 
-struct thread *
-find_thread(tid_t tid) {
-
-    struct list_elem *item;   
-    struct thread *the_thread;
-    enum intr_level status = intr_disable();
-    for(item = list_begin(&all_list); item != list_end(&all_list); item = list_next(item)) 
-    {
-        the_thread = list_entry(item, struct thread, allelem);
-        if(the_thread->tid == tid) 
-        {
-            intr_set_level(status);
-            return the_thread;
-        }
-    }
-    intr_set_level(status);
-    return NULL;
-}
-
-struct process_container* find_process_container(struct list* processes, tid_t child_tid)
-{
-    ASSERT(processes != NULL)
-
-    struct list_elem* item;
-    struct process_container* child;
-    if (list_empty(processes) == false)
-    {
-        
-        for(item = list_begin(processes); item != list_end(processes); item = list_next(item))
-        {
-            child = list_entry(item, struct process_container, elem);
-            if (child->tid == child_tid)
-            {
-                return child;
-            }            
-        }
-    }
-    return NULL;
-}
-
-struct thread_file_container* find_file_container(struct list* files, int fid)
-{
-    ASSERT(files != NULL)
-
-    struct list_elem* item;
-    struct thread_file_container* file;
-    if (list_empty(files) == false)
-    {
-
-        for (item = list_begin(files); item != list_end(files); item = list_next(item))
-        {
-            file = list_entry(item, struct thread_file_container, elem);
-            if (file->fid == fid)
-            {
-                return file;
-            }
-        }
-    }
-    return NULL;
-}
-
-int next_fid(struct thread* t)
-{
-    lock_thread(t);
-    int fid = t->next_fid;
-    t->next_fid++;
-    unlock_thread(t);
-    return fid;
-}
-
-void lock_thread(struct thread* t)
-{
-    lock_acquire(&t->my_lock);
-}
-
-void unlock_thread(struct thread* t)
-{
-    lock_release(&t->my_lock);
-}
-
 /* Returns true if T appears to point to a valid thread. */
 static bool
 is_thread (struct thread *t)
@@ -583,14 +470,11 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  list_init (&t->children);
+  t->wait_status = NULL;
+  list_init (&t->fds);
+  t->next_handle = 2;
   t->magic = THREAD_MAGIC;
-  t->next_fid = 2;
-  t->my_code = NULL;
-  t->is_kernal = false;
-
-  list_init(&t->my_files);
-  list_init(&t->my_children_processes);
-  lock_init(&t->my_lock);
   list_push_back (&all_list, &t->allelem);
 }
 

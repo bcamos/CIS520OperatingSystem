@@ -131,10 +131,9 @@ main (void)
   
   /* Run actions specified on kernel command line. */
   run_actions (argv);
-  thread_current()->is_kernal = true;
+
   /* Finish up. */
   shutdown ();
-  
   thread_exit ();
 }
 

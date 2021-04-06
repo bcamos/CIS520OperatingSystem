@@ -4,8 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include <threads/synch.h>
-#include "filesys/file.h"
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -25,19 +24,6 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
-/* Inspired from: https://github.com/st2092/pintos-user-programs/blob/master/src/userprog/syscall.h/*/
-struct process_container
-{
-    tid_t tid;
-    int exit_status;
-    bool is_alive;
-    struct semaphore waiting_threads;
-    struct list_elem elem;
-
-    bool loaded_successful;
-    struct semaphore load_sema;
-};
 
 /* A kernel thread or user process.
 
@@ -105,6 +91,10 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+    /* Owned by process.c. */
+    struct wait_status *wait_status;    /* This process's completion status. */
+    struct list children;               /* Completion status of children. */
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -112,26 +102,30 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+    struct file *bin_file;              /* Executable. */
+
+    /* Owned by syscall.c. */
+    struct list fds;                    /* List of file descriptors. */
+    int next_handle;                    /* Next handle value. */
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-    struct list my_files;
-    int next_fid;    
-    struct list my_children_processes;
-    int parent_tid;
-    struct lock my_lock;
-
-    struct process_container* self;
-    struct file* my_code;
-    bool is_kernal;
   };
 
-struct thread_file_container
-{
-    struct file* file;
-    int fid;
-    struct list_elem elem;
-};
+/* Tracks the completion of a process.
+   Reference held by both the parent, in its `children' list,
+   and by the child, in its `wait_status' pointer. */
+struct wait_status
+  {
+    struct list_elem elem;              /* `children' list element. */
+    struct lock lock;                   /* Protects ref_cnt. */
+    int ref_cnt;                        /* 2=child and parent both alive,
+                                           1=either child or parent alive,
+                                           0=child and parent both dead. */
+    tid_t tid;                          /* Child thread id. */
+    int exit_code;                      /* Child exit code, if dead. */
+    struct semaphore dead;              /* 1=child alive, 0=child dead. */
+  };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -169,10 +163,4 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-struct thread * find_thread(tid_t tid);
-struct process_container* find_process_container(struct list* processes, tid_t child_tid);
-struct thread_file_container* find_file_container(struct list* files, int fid);
-int next_fid(struct thread *t);
-void lock_thread(struct thread* t);
-void unlock_thread(struct thread* t);
 #endif /* threads/thread.h */
