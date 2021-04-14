@@ -9,6 +9,8 @@
 #include "userprog/pagedir.h"
 #include "threads/vaddr.h"
 
+// altered by Dawson Field
+
 /* Maximum size of process stack, in bytes. */
 #define STACK_MAX (1024 * 1024)
 
@@ -51,9 +53,10 @@ page_for_addr (const void *address)
         return hash_entry (e, struct page, hash_elem);
 
       /* No page.  Expand stack? */
-
-/* add code */
-
+      if ((p.addr > PHYS_BASE - STACK_MAX) && ((void*)thread_current()->user_esp - 32 < address)) 
+      {
+          return page_allocate(p.addr, false);
+      }
     }
   return NULL;
 }
@@ -145,15 +148,50 @@ page_out (struct page *p)
      dirty bit, to prevent a race with the process dirtying the
      page. */
 
-/* add code here */
+  pagedir_clear_page(p->thread->pagedir, (void*)p->addr);
 
   /* Has the frame been modified? */
+  /* If the frame has previously been modified the dirty bool will be set to true */
 
-/* add code here */
+  dirty = pagedir_is_dirty(p->thread->pagedir->, (const void*)p->addr);
+
+  /* If the frame is not dirty and not null, the page has been evicted sucessfully*/
+
+  if (!dirty)
+  {
+      ok = true;
+  }
+
+  /* If the frame is null, cannot write the frame to disk, attempt to swap file out and check if swap was sucessful with bool "ok" */
+
+  if (p->file == NULL)
+  {
+      ok = swap_out(p);
+  }
 
   /* Write frame contents to disk if necessary. */
+  /* if all other statements are false, a file exists for this page, if file has been modified it must be written to the disk again or swapped*/
 
-/* add code here */
+  else
+  {
+      if (dirty)
+      {
+          if (p->private)
+          {
+              ok = swap_out(p);
+          }
+          else
+          {
+              ok = file_write_at(p->file, (const void*)p->frame->base, p->file_bytes, p->file_offest);
+          }
+      }
+  }
+
+  /* Nullify frame in page*/
+  if (ok)
+  {
+      p->frame = NULL;
+  }
 
   return ok;
 }
