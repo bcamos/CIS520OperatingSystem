@@ -31,15 +31,14 @@
 #else
 #include "tests/threads/tests.h"
 #endif
-#ifdef VM
-#include "vm/frame.h"
-#endif
 #ifdef FILESYS
 #include "devices/block.h"
 #include "devices/ide.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
+#include "vm/frame.h"
+#include "vm/swap.h"
 
 /* Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
@@ -123,17 +122,15 @@ main (void)
   serial_init_queue ();
   timer_calibrate ();
 
-#ifdef VM
-  init_frames();
-#endif
-
-
 #ifdef FILESYS
   /* Initialize file system. */
   ide_init ();
   locate_block_devices ();
   filesys_init (format_filesys);
 #endif
+
+  frame_init ();
+  swap_init ();
 
   printf ("Boot complete.\n");
   

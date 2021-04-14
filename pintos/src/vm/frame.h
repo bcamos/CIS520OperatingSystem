@@ -1,17 +1,23 @@
-#ifndef _FRAME_H
-#define _FRAME_H
+#ifndef VM_FRAME_H
+#define VM_FRAME_H
 
-#include <stdio.h>
-#include "threads/thread.h"
-#include <list.h>
+#include <stdbool.h>
+#include "threads/synch.h"
 
-struct frame_elememt
-{
-	void *frame;
-	tid_t owner_tid;
-	struct list_elem elem;
-};
+/* A physical frame. */
+struct frame 
+  {
+    struct lock lock;           /* Prevent simultaneous access. */
+    void *base;                 /* Kernel virtual base address. */
+    struct page *page;          /* Mapped process page, if any. */
+  };
 
-void init_frames();
+void frame_init (void);
 
-#endif
+struct frame *frame_alloc_and_lock (struct page *);
+void frame_lock (struct page *);
+
+void frame_free (struct frame *);
+void frame_unlock (struct frame *);
+
+#endif /* vm/frame.h */
