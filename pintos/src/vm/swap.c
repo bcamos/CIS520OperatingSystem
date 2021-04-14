@@ -79,7 +79,7 @@ swap_out (struct page *p)
   {
       int offset = (i * BLOCK_SECTOR_SIZE);
       const void* buffer = p->frame->base + offset;
-      block_write(swap_device, p->sector, buffer);
+      block_write(swap_device, p->sector + i, buffer);
   }
  
   p->private = false;
