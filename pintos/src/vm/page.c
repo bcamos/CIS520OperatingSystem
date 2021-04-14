@@ -156,8 +156,10 @@ page_out (struct page *p)
   dirty = pagedir_is_dirty(p->thread->pagedir, (const void*)p->addr);
 
   /* If the frame is not dirty and not null, the page has been evicted sucessfully*/
-
-  ok = !dirty;
+  if (!dirty)
+  {
+      ok = true;
+  }  
 
   /* If the frame is null, cannot write the frame to disk, attempt to swap file out and check if swap was sucessful with bool "ok" */
 
