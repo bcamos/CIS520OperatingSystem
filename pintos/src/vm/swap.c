@@ -60,8 +60,7 @@ bool
 swap_out (struct page *p) 
 {
   size_t slot;
-  size_t i;
-  int i;
+  size_t i;  
 
   ASSERT (p->frame != NULL);
   ASSERT (lock_held_by_current_thread (&p->frame->lock));

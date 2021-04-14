@@ -153,7 +153,7 @@ page_out (struct page *p)
   /* Has the frame been modified? */
   /* If the frame has previously been modified the dirty bool will be set to true */
 
-  dirty = pagedir_is_dirty(p->thread->pagedir->, (const void*)p->addr);
+  dirty = pagedir_is_dirty(p->thread->pagedir, (const void*)p->addr);
 
   /* If the frame is not dirty and not null, the page has been evicted sucessfully*/
 
@@ -182,7 +182,7 @@ page_out (struct page *p)
           }
           else
           {
-              ok = file_write_at(p->file, (const void*)p->frame->base, p->file_bytes, p->file_offest);
+              ok = file_write_at(p->file, (const void*)p->frame->base, p->file_bytes, p->file_offset);
           }
       }
   }
