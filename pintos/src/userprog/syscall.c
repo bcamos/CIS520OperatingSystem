@@ -560,7 +560,9 @@ sys_mmap (int handle, void *addr)
 static int
 sys_munmap (int mapping) 
 {
-/* add code here */
+ struct mapping *map = lookup_mapping(mapping);
+	
+	unmap(map);
 
   return 0;
 }
