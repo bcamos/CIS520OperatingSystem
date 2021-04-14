@@ -157,10 +157,7 @@ page_out (struct page *p)
 
   /* If the frame is not dirty and not null, the page has been evicted sucessfully*/
 
-  if (!dirty)
-  {
-      ok = true;
-  }
+  ok = !dirty;
 
   /* If the frame is null, cannot write the frame to disk, attempt to swap file out and check if swap was sucessful with bool "ok" */
 

@@ -77,7 +77,8 @@ swap_out (struct page *p)
   /* Inspired from https://github.com/ChristianJHughes/pintos-project3/blob/master/pintos3/src/vm/swap.c */
   for ( i = 0; i < PAGE_SECTORS; i++ )
   {
-      const void* buffer = p->frame->base + (i * BLOCK_SECTOR_SIZE);
+      int offset = (i * BLOCK_SECTOR_SIZE);
+      const void* buffer = p->frame->base + offset;
       block_write(swap_device, p->sector, buffer);
   }
  
