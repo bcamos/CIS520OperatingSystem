@@ -86,18 +86,29 @@ This checks on commands that manat the stack memory such as PUSH/PUSHA which can
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+We didn't add/modify any new major data structs -- however from project 2 -> project 3 base code that we were given, 
+a quick overview: 
+	+struct page (denoting a virtual address which maps to a physical address frame, along with a few fields for file access/restrictions/locations etc.)
+	+struct frame (container for physical address along with a lock for the region)
+	struct thread was also added a list/hash of pages and mappings assoicated with that thread
+
 ---- ALGORITHMS ----
 
 >> C2: Describe how memory mapped files integrate into your virtual
 >> memory subsystem.  Explain how the page fault and eviction
 >> processes differ between swap pages and other pages.
 
-mmap uses the fd passed in as a parameter to map the open file into the virtual address space. When a page is evicted it means the page mapped by mmap writes the contents of the virtual page back to the file it was mapped from. When eviction is executed if pages have been modified they should be written to swap. In page fault, if the memory reference is valid then the supplemental page table entry is used to locate the data that goes in the page. Any invalid access terminates the process and frees all resources. Page fault and eviction are both kernel processes that use swap pages to move data around and store changes to files if evicted. 
+mmap uses the fd passed in as a parameter to map the open file into the virtual address space. 
+When a page is evicted it means the page mapped by mmap writes the contents of the virtual page back to the file it was mapped from. 
+When eviction is executed if pages have been modified they should be written to swap. 
+In page fault, if the memory reference is valid then the supplemental page table entry is used to locate the data that goes in the page.
+Any invalid access terminates the process and frees all resources. Page fault and eviction are both kernel processes that use swap pages to move data around and store changes to files if evicted. 
 
 >> C3: Explain how you determine whether a new file mapping overlaps
 >> any existing segment.
 
-The page_allocate function will fail if the address parameter provided already exists. Page_allocation is called while the file length is not equal to 0. So if there is any overlap, page_allocate will fail and mmap will return -1. 
+The page_allocate function will fail if the address parameter provided already exists. 
+Page_allocation is called while the file length is not equal to 0. So if there is any overlap, page_allocate will fail and mmap will return -1. 
 
 ---- RATIONALE ----
 
@@ -107,6 +118,9 @@ The page_allocate function will fail if the address parameter provided already e
 >> that much of their implementation can be shared.  Explain why your
 >> implementation either does or does not share much of the code for
 >> the two situations.
+
+There is some overlap from the use of pages -- that is, the page functions are called to handle vm memory in the system calls, which is about the extent of the
+"shared portion;" although it is also an important one because handling vm in two different ways might cause some inconsistency in mappings when backtracing.
 
 			   SURVEY QUESTIONS
 			   ================
@@ -126,6 +140,11 @@ the quarter.
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
+
+We had a considerable amount of confusion in terms of the expectations of this project since originally we started with no vm code and Canvas was suggesting otherwise in FAQ in terms of changes necessary; 
+i would definitely recommend adding a specific comment to the writeup for Project 3 for future semesters that mentions that starter code for vm is given -- 
+otherwise, we were considerably confused since the pintos writeup has students do the entire project 3 from scratch. We were pretty excited to have the former, although were a bit stressed
+from the uncertainty.
 
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
