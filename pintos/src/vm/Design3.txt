@@ -61,8 +61,12 @@ Nathan Brown
 >> memory subsystem.  Explain how the page fault and eviction
 >> processes differ between swap pages and other pages.
 
+mmap uses the fd passed in as a parameter to map the open file into the virtual address space. When a page is evicted it means the page mapped by mmap writes the contents of the virtual page back to the file it was mapped from. When eviction is executed if pages have been modified they should be written to swap. In page fault, if the memory reference is valid then the supplemental page table entry is used to locate the data that goes in the page. Any invalid access terminates the process and frees all resources. Page fault and eviction are both kernel processes that use swap pages to move data around and store changes to files if evicted. 
+
 >> C3: Explain how you determine whether a new file mapping overlaps
 >> any existing segment.
+
+The page_allocate function will fail if the address parameter provided already exists. Page_allocation is called while the file length is not equal to 0. So if there is any overlap, page_allocate will fail and mmap will return -1. 
 
 ---- RATIONALE ----
 
