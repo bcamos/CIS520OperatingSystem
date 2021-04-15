@@ -521,13 +521,9 @@ unmap (struct mapping *m)
 		 file_write_at( m->file, m->base + offset, PGSIZE * m->page_cnt, offset );
 		 lock_release( &fs_lock );
 	  }
-   }	
-   
-   for( i = 0; i < m->page_cnt; i++ )
-   {
-       offset = PGSIZE * i;
-       page_deallocate( m->base + offset );
-   }
+      
+      page_deallocate( m->base + offset );
+   }  
 }
  
 /* Mmap system call. */
