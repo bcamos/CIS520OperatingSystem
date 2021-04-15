@@ -13,6 +13,13 @@
 
 /* Maximum size of process stack, in bytes. */
 #define STACK_MAX (1024 * 1024)
+#define PUSHA_OFFSET 32
+struct lock save_lock;
+
+void page_init(void)
+{
+    lock_init(&save_lock);
+}
 
 /* Destroys a page, which must be in the current process's
    page table.  Used as a callback for hash_destroy(). */
@@ -45,15 +52,16 @@ page_for_addr (const void *address)
     {
       struct page p;
       struct hash_elem *e;
+      struct thread* cur = thread_current();
 
       /* Find existing page. */
       p.addr = (void *) pg_round_down (address);
-      e = hash_find (thread_current ()->pages, &p.hash_elem);
+      e = hash_find (cur->pages, &p.hash_elem);
       if (e != NULL)
         return hash_entry (e, struct page, hash_elem);
 
-      /* No page.  Expand stack? */
-      if ((p.addr > PHYS_BASE - STACK_MAX) && ((void*)thread_current()->user_esp - 32 < address)) 
+      
+      if ( p.addr > PHYS_BASE - STACK_MAX && address > cur->user_esp - PUSHA_OFFSET ) 
       {
           return page_allocate(p.addr, false);
       }
@@ -150,44 +158,24 @@ page_out (struct page *p)
 
   pagedir_clear_page(p->thread->pagedir, (void*)p->addr);
 
-  /* Has the frame been modified? */
-  /* If the frame has previously been modified the dirty bool will be set to true */
-
   dirty = pagedir_is_dirty(p->thread->pagedir, (const void*)p->addr);
+  ok = dirty == false; 
 
-  /* If the frame is not dirty and not null, the page has been evicted sucessfully*/
-  if (!dirty)
-  {
-      ok = true;
-  }  
-
-  /* If the frame is null, cannot write the frame to disk, attempt to swap file out and check if swap was sucessful with bool "ok" */
-
-  if (p->file == NULL)
+  /* Inspired from https://github.com/ChristianJHughes/pintos-project3/blob/master/pintos3/src/vm/swap.c */
+  // Need to swap if the file isn't mapped, or if the page was modified and private, otherwise we're good to save to the file if we need to
+  if ( p->file == NULL || ( dirty == true && p->private == true ) )
   {
       ok = swap_out(p);
   }
-
-  /* Write frame contents to disk if necessary. */
-  /* if all other statements are false, a file exists for this page, if file has been modified it must be written to the disk again or swapped*/
-
-  else
+  else if ( dirty == true )
   {
-      if (dirty)
-      {
-          if (p->private)
-          {
-              ok = swap_out(p);
-          }
-          else
-          {
-              ok = file_write_at(p->file, (const void*)p->frame->base, p->file_bytes, p->file_offset);
-          }
-      }
+      lock_acquire(&save_lock);
+      ok = file_write_at(p->file, p->frame->base, p->file_bytes, p->file_offset);
+      lock_release(&save_lock);
   }
 
-  /* Nullify frame in page*/
-  if (ok)
+  // Make page free to map another frame if eviction was successful
+  if ( ok == true )
   {
       p->frame = NULL;
   }

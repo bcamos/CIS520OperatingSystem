@@ -76,10 +76,11 @@ swap_out (struct page *p)
   // Write out page sectors
   /* Inspired from https://github.com/ChristianJHughes/pintos-project3/blob/master/pintos3/src/vm/swap.c */
   for ( i = 0; i < PAGE_SECTORS; i++ )
-  {
+  {      
+      block_sector_t sector = p->sector + i;
       int offset = (i * BLOCK_SECTOR_SIZE);
       const void* buffer = p->frame->base + offset;
-      block_write(swap_device, p->sector + i, buffer);
+      block_write(swap_device, sector, buffer);
   }
  
   p->private = false;

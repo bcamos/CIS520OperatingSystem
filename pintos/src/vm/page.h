@@ -32,6 +32,7 @@ struct page
     off_t file_bytes;           /* Bytes to read/write, 1...PGSIZE. */
   };
 
+void page_init(void);
 void page_exit (void);
 
 struct page *page_allocate (void *, bool read_only);
