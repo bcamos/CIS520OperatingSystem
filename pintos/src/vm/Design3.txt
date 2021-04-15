@@ -62,9 +62,20 @@ A global lock for frames, called 'scan_lock', which is grabbed whenever we are a
 >> B1: When a frame is required but none is free, some frame must be
 >> evicted.  Describe the algorithm used to choose a frame to evict.
 
+If all of the frames are currently in use, our code determines an ideal frame to evict in order to free up a frame.
+To do this we must evict the least recently accessed frame, the algorithm that does this is implemented in try_frame_alloc_and_lock() in 'frame.c'.
+If the frame we are looking for has no associated page, then the algorithm acquires the frame. Else it acquires the least recently accessed frame.
+If all frames have been accessed recently, the code iterates over all frames, in this case it is almost certain that a valid frame will be found due to the page_accessed_recently() function changing the access status of the frame when it is called.
+If all of these cases fail and no valid frame is returned, a NULL case is returned and no frame will be evicted.
+
+
 >> B2: Explain your heuristic for deciding whether a page fault for an
 >> invalid virtual address should cause the stack to be extended into
 >> the page that faulted.
+
+First you must check that the address of the page boundary rounded down to the page boundary is within the stack space which is 1MB by default.
+Then we must check that the page address unrounded is within 32bytes of the user_esp of the thread.
+This checks on commands that manat the stack memory such as PUSH/PUSHA which can access memory up to 32 Bytes past the stack pointer.
 
 			 MEMORY MAPPED FILES
 			 ===================
