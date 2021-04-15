@@ -17,9 +17,19 @@ Nathan Brown
 >> If you have any preliminary comments on your submission, notes for the
 >> TAs, or extra credit, please give them here.
 
+We used the code (project3_recompiled) given in Canvas as our starting code, and provided implementations for the methods stubs within the code.
+Our current solution passes all tests; however, there were a couple times that I edited a comment or something  and it caused 3 random tests to fail
+unexpectantly. For the most part, our tests pass, however, there could be some sort of weird edge case we aren't addressing; i (Ben) have a screenshot of all our
+tests passing if they don't pass on the autograde in the first batch.
+
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
+
+https://github.com/ChristianJHughes/pintos-project3/blob/master/pintos3/src/userprog/syscall.c
+https://www.youtube.com/watch?v=M1FJvXgZhdo
+https://static1.squarespace.com/static/5b18aa0955b02c1de94e4412/t/5b85fad2f950b7b16b7a2ed6/1535507195196/Pintos+Guide
+
 
 			PAGE TABLE MANAGEMENT
 			=====================
@@ -29,10 +39,20 @@ Nathan Brown
 >> A1: In a few paragraphs, describe the existing code for locating the
 >> frame, if any, that contains the data of a given page.
 
+Not entirely sure how to answer in terms of "existing" because vm was empty before project 3. This was implemented in this project.
+On the assumption of algorithm of the additions this project: The struct 'page' contains the user's virtual address along
+with a mapping to the physical/frame address in memory. 
+
+To find a frame from virtual memory, the virtual address is passed to any of the paging functions; we lookup the page associated with that
+address in the function page_for_addr, we have to adjust the address to the nearest pg boundary since the address could be anywhere within that page but not denoting the start of the page itself.
+Once we find the page, if it exists, we then lookup the frame struct (a field of the page struct) and are able to find the physical/true memory there (ptr 'base' denotes the beginning of this frame within the frame struct). 
+
 ---- SYNCHRONIZATION ----
 
 >> A2: When two user processes both need a new frame at the same time,
 >> how are races avoided?
+
+A global lock for frames, called 'scan_lock', which is grabbed whenever we are allocating or mapping frames to pages which prevents the race condition.
 
 		       PAGING TO AND FROM DISK
 		       =======================
