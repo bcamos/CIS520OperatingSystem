@@ -504,22 +504,29 @@ lookup_mapping (int handle)
 static void
 unmap (struct mapping *m) 
 {
-   list_remove(&m->elem);
-   int j = 0;	
-   for(j; j < m->page_cnt; j++)
+   int i;
+   int offset;
+   struct thread* cur = thread_current();
+    /* Inspired from https://github.com/ChristianJHughes/pintos-project3/blob/master/pintos3/src/vm/swap.c */
+   list_remove( &m->elem );
+   	
+   for( i = 0; i < m->page_cnt; i++ )
    {
-	if(pagedir_is_dirty(thread_current()->pagedir, ((const void *) ((m->base) + (PGSIZE * j)))))
-	{
-		lock_acquire(&fs_lock);
-		file_write_at(m->file, (const void *) (m->base + (PGSIZE * j)), (PGSIZE*(m->page_cnt)), (PGSIZE * j));
-		lock_release(&fs_lock);
-	}
-   }
-	
-   int k = 0;
-   for(k; k < m->page_cnt; k++)
+      offset = PGSIZE * i;
+
+      // If page was modified, need to save changes
+	  if( pagedir_is_dirty(cur->pagedir, m->base + offset) == true )
+	  {
+		 lock_acquire( &fs_lock );
+		 file_write_at( m->file, m->base + offset, PGSIZE * m->page_cnt, offset );
+		 lock_release( &fs_lock );
+	  }
+   }	
+   
+   for( i = 0; i < m->page_cnt; i++ )
    {
-	page_deallocate((void *) ((m->base) + (PGSIZE * k)));
+       offset = PGSIZE * i;
+       page_deallocate( m->base + offset );
    }
 }
  
@@ -563,7 +570,7 @@ sys_mmap (int handle, void *addr)
       p->private = false;
       p->file = m->file;
       p->file_offset = offset;
-      p->file_bytes = length >= ? PGSIZE : length;
+      p->file_bytes = length >= PGSIZE ? PGSIZE : length;
       offset += p->file_bytes;
       length -= p->file_bytes;
       m->page_cnt++;
